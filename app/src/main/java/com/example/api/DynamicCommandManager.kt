@@ -351,57 +351,14 @@ object DynamicCommandManager {
                     !rawStatus.equals("Ended", ignoreCase = true) &&
                     !rawStatus.equals("Session_End", ignoreCase = true)
 
-                // If this update is from ourselves, we skip it to prevent echo loops, UNLESS remote status has transitioned to IDLE/Ended
+                // If this update is from ourselves, we skip it to prevent echo loops
                 if (cmdDevice == myDevice) {
-                    var hasLocalActive = com.example.util.FocusTimerManager.isTimerRunning.value ||
-                        com.example.util.FocusTimerManager.isStopwatchActive.value ||
-                        com.example.util.FocusTimerManager.isPaused.value ||
-                        prefs.getBoolean("timer_is_running", false) ||
-                        prefs.getBoolean("timer_is_stopwatch_active", false) ||
-                        prefs.getBoolean("is_paused", false)
-                    if (!hasLocalActive) {
-                        try {
-                            val db = com.example.data.AppDatabase.getInstance(appContext)
-                            val activeSess = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
-                                db.localActiveSessionDao().getActiveSession()
-                            }
-                            if (activeSess != null) {
-                                hasLocalActive = true
-                            }
-                        } catch (e: Exception) {
-                            // Ignore
-                        }
-                    }
-
-                    if (hasLocalActive && isRemoteActive) {
-                        Log.d(TAG, "Local device is the source of this update ($cmdDevice). Skipping calibration.")
-                        return
-                    } else if (!hasLocalActive && !isRemoteActive) {
-                        Log.d(TAG, "Both local and remote are already IDLE. Skipping calibration.")
-                        return
-                    } else {
-                        Log.d(TAG, "Sync state transition detected (hasLocalActive=$hasLocalActive, isRemoteActive=$isRemoteActive). Proceeding with calibration!")
-                        if (!isRemoteActive) {
-                            prefs.edit().putBoolean("is_command_device", true).apply()
-                            isLocalCommander = true
-                        }
-                    }
-                }
-
-                // If the update is from another device that is ACTIVELY running a session, and we were previously the commander,
-                // we yield and become a follower/reader!
-                if (isLocalCommander && isRemoteActive && cmdDevice.isNotEmpty() && cmdDevice != myDevice) {
-                    Log.d(TAG, "Received update from another active commanding device '$cmdDevice'. Yielding commander role.")
-                    prefs.edit().putBoolean("is_command_device", false).apply()
-                    isLocalCommander = false
-                }
-
-                // If we are still in commanding mode and remote is active from another device, skip calibration.
-                // However, if remote is IDLE/Ended, we MUST calibrate to reset local state to IDLE!
-                if (isLocalCommander && isRemoteActive && cmdDevice != myDevice) {
-                    Log.d(TAG, "Local device is commanding device and remote is active. Skipping reading/calibration from Firebase.")
+                    Log.d(TAG, "Local device is the command device ($cmdDevice). Skipping calibration.")
                     return
                 }
+
+                // Since update is from another device (or remote reset), automatically become reading mode!
+                prefs.edit().putBoolean("is_command_device", false).apply()
 
                 // If we are a reading device or remote is IDLE/Ended, we sync the timer state live!
                 val cleanRaw = rawStatus.lowercase().trim()
@@ -492,46 +449,12 @@ object DynamicCommandManager {
             var isLocalCommander = prefs.getBoolean("is_command_device", true)
 
             if (cmdDevice == myDevice) {
-                var hasLocalActive = com.example.util.FocusTimerManager.isTimerRunning.value ||
-                    com.example.util.FocusTimerManager.isStopwatchActive.value ||
-                    com.example.util.FocusTimerManager.isPaused.value ||
-                    prefs.getBoolean("timer_is_running", false) ||
-                    prefs.getBoolean("timer_is_stopwatch_active", false) ||
-                    prefs.getBoolean("is_paused", false)
-                if (!hasLocalActive) {
-                    try {
-                        val db = com.example.data.AppDatabase.getInstance(appContext)
-                        val activeSess = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
-                            db.localActiveSessionDao().getActiveSession()
-                        }
-                        if (activeSess != null) {
-                            hasLocalActive = true
-                        }
-                    } catch (e: Exception) {
-                        // Ignore
-                    }
-                }
-
-                if (hasLocalActive && isRemoteActive) {
-                    Log.d(TAG, "forceReadActiveFocusTimerAndCalibrate: Source is ourselves and both active. Skipping calibration.")
-                    return@addOnSuccessListener
-                } else if (!hasLocalActive && !isRemoteActive) {
-                    Log.d(TAG, "forceReadActiveFocusTimerAndCalibrate: Both local and remote are IDLE. Skipping calibration.")
-                    return@addOnSuccessListener
-                } else {
-                    Log.d(TAG, "forceReadActiveFocusTimerAndCalibrate: Sync state transition detected (hasLocalActive=$hasLocalActive, isRemoteActive=$isRemoteActive). Proceeding with calibration!")
-                    if (!isRemoteActive) {
-                        prefs.edit().putBoolean("is_command_device", true).apply()
-                        isLocalCommander = true
-                    }
-                }
+                Log.d(TAG, "forceReadActiveFocusTimerAndCalibrate: Local device is command device ($cmdDevice). Skipping calibration.")
+                return@addOnSuccessListener
             }
 
-            if (isLocalCommander && isRemoteActive && cmdDevice.isNotEmpty() && cmdDevice != myDevice) {
-                Log.d(TAG, "forceReadActiveFocusTimerAndCalibrate: Yielding commander role to '$cmdDevice'")
-                prefs.edit().putBoolean("is_command_device", false).apply()
-                isLocalCommander = false
-            }
+            // Remote device update: automatically become reading mode!
+            prefs.edit().putBoolean("is_command_device", false).apply()
 
             val cleanRawForce = rawStatus.lowercase().trim()
             val statusStr = if (cleanRawForce == "relaxing" || cleanRawForce == "end" || cleanRawForce == "completed" || cleanRawForce == "ended" || cleanRawForce == "session_end") "idle" else rawStatus
@@ -645,6 +568,7 @@ object DynamicCommandManager {
         val isLocalCommander = prefs.getBoolean("is_command_device", true)
         val isLocalTimerRunning = com.example.util.FocusTimerManager.isTimerRunning.value
         val isLocalStopwatchActive = com.example.util.FocusTimerManager.isStopwatchActive.value
+        val isLocalPaused = com.example.util.FocusTimerManager.isPaused.value
 
         val cleanStatusStr = statusStr.lowercase().trim()
         val lastEventName = timeline.lastOrNull()?.event?.lowercase()?.trim() ?: ""
@@ -659,8 +583,8 @@ object DynamicCommandManager {
             lastEventName == "completed" ||
             lastEventName == "session_end"
 
-        if (!isTargetIdle && isLocalCommander && (isLocalTimerRunning || isLocalStopwatchActive)) {
-            Log.d(TAG, "calibrateLocalState: Local device is the commander and the timer is actively running. Skipping calibration to prevent feedback jitter.")
+        if (isLocalCommander && (isLocalTimerRunning || isLocalStopwatchActive || isLocalPaused)) {
+            Log.d(TAG, "calibrateLocalState: Local device is commander and active/paused. Skipping calibration to preserve active local session.")
             return
         }
 

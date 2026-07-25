@@ -1797,7 +1797,8 @@ object FocusTimerManager {
         _isTimerRunning.value = false
 
         val elapsedSecs = _cumulativeSessionFocusSeconds.value
-        addSystemLog(appContext, "Reset Timer", "BUTTON_PRESS", "SaveSession=$saveSession, ElapsedSecs=${elapsedSecs}s")
+        val logCat = if (isPassiveCalibrationInProgress || !saveSession) "CALIBRATION" else "BUTTON_PRESS"
+        addSystemLog(appContext, "Reset Timer", logCat, "SaveSession=$saveSession, ElapsedSecs=${elapsedSecs}s")
         
         // Zero out active timer memory state immediately so UI won't double count
         _cumulativeSessionFocusSeconds.value = 0
@@ -2256,7 +2257,8 @@ object FocusTimerManager {
         _isStopwatchActive.value = false
 
         val elapsedSecs = _stopwatchSeconds.value
-        addSystemLog(appContext, "Reset Stopwatch", "BUTTON_PRESS", "SaveSession=$saveSession, Seconds=${elapsedSecs}s")
+        val logCat = if (isPassiveCalibrationInProgress || !saveSession) "CALIBRATION" else "BUTTON_PRESS"
+        addSystemLog(appContext, "Reset Stopwatch", logCat, "SaveSession=$saveSession, Seconds=${elapsedSecs}s")
         
         // Zero out active stopwatch memory state immediately so UI won't double count
         _stopwatchSeconds.value = 0
