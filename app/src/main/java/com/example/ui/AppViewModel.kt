@@ -2512,54 +2512,45 @@ class AppViewModel(
     }
 
     fun handleGoogleSignInSuccess(username: String, email: String, displayName: String, idToken: String? = null) {
+        val googleAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(getApplication())
+        val gmailPhotoUrl = googleAccount?.photoUrl?.toString() ?: ""
+
+        prefs.edit()
+            .putString("user_name_${username}", displayName)
+            .putString("user_nickname_${username}", displayName)
+            .putString("user_emoji_${username}", gmailPhotoUrl)
+            .putString("user_email_${username}", email)
+            .apply()
+
+        setLoggedIn(username, false)
+        if (displayName.isEmpty()) {
+            navigateTo(Screen.PROFILE_SETUP)
+        } else if (!areMandatoryPermissionsGranted()) {
+            navigateTo(Screen.PERMISSION_ONBOARDING)
+        } else {
+            navigateTo(getDefaultScreen())
+        }
+
+        // Run background Google Drive auto-retrieval asynchronously without blocking login navigation
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val googleAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(getApplication())
-                val gmailPhotoUrl = googleAccount?.photoUrl?.toString() ?: ""
-                
-                // Fetch remaining data from Google Drive AppData folder automatically on login
-                // (Omit focus data restoration from Google Drive since it's fetched from Firestore/RTDB automatically)
-                try {
-                    val context = getApplication<android.app.Application>()
-                    if (com.example.util.GoogleDriveSyncManager.hasDrivePermission(context)) {
-                        android.util.Log.i("AppViewModel", "New Google login detected. Attempting auto-retrieval of remaining app data and Keep notes from Google Drive...")
-                        val db = com.example.data.AppDatabase.getInstance(context)
-                        
-                        // 1. Restore overall app database and physical files (remaining data)
-                        val (dbSuccess, dbMsg) = com.example.util.GoogleDriveSyncManager.restoreAllAppData(context, db)
-                        android.util.Log.i("AppViewModel", "Auto-retrieval of remaining app data from Google Drive finished: success=$dbSuccess, message=$dbMsg")
-                        
-                        // 2. Synchronize Google Keep notes
-                        val (notesSuccess, notesMsg) = com.example.util.GoogleDriveSyncManager.syncKeepNotes(context, db)
-                        android.util.Log.i("AppViewModel", "Auto-sync of Keep notes from Google Drive finished: success=$notesSuccess, message=$notesMsg")
-                    } else {
-                        android.util.Log.i("AppViewModel", "Google Drive permission not granted yet. Skipping automatic restore on login.")
-                    }
-                } catch (driveErr: Exception) {
-                    android.util.Log.e("AppViewModel", "Failed to auto-retrieve remaining data from Google Drive", driveErr)
+                val context = getApplication<android.app.Application>()
+                if (com.example.util.GoogleDriveSyncManager.hasDrivePermission(context)) {
+                    android.util.Log.i("AppViewModel", "New Google login detected. Attempting auto-retrieval of remaining app data and Keep notes from Google Drive...")
+                    val db = com.example.data.AppDatabase.getInstance(context)
+                    
+                    // 1. Restore overall app database and physical files (remaining data)
+                    val (dbSuccess, dbMsg) = com.example.util.GoogleDriveSyncManager.restoreAllAppData(context, db)
+                    android.util.Log.i("AppViewModel", "Auto-retrieval of remaining app data from Google Drive finished: success=$dbSuccess, message=$dbMsg")
+                    
+                    // 2. Synchronize Google Keep notes
+                    val (notesSuccess, notesMsg) = com.example.util.GoogleDriveSyncManager.syncKeepNotes(context, db)
+                    android.util.Log.i("AppViewModel", "Auto-sync of Keep notes from Google Drive finished: success=$notesSuccess, message=$notesMsg")
+                } else {
+                    android.util.Log.i("AppViewModel", "Google Drive permission not granted yet. Skipping automatic restore on login.")
                 }
-
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    prefs.edit()
-                        .putString("user_name_${username}", displayName)
-                        .putString("user_nickname_${username}", displayName)
-                        .putString("user_emoji_${username}", gmailPhotoUrl)
-                        .putString("user_email_${username}", email)
-                        .apply()
-
-                    setLoggedIn(username, false)
-                    if (displayName.isEmpty()) {
-                        navigateTo(Screen.PROFILE_SETUP)
-                    } else if (!areMandatoryPermissionsGranted()) {
-                        navigateTo(Screen.PERMISSION_ONBOARDING)
-                    } else {
-                        navigateTo(getDefaultScreen())
-                    }
-                }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                android.util.Log.e("AppViewModel", "Google Sign In handler failed", e)
+            } catch (driveErr: Exception) {
+                android.util.Log.e("AppViewModel", "Failed to auto-retrieve remaining data from Google Drive", driveErr)
             }
         }
     }

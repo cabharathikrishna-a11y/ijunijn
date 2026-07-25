@@ -370,6 +370,12 @@ object DynamicCommandManager {
                     return
                 }
 
+                // If both local device and remote device are IDLE, skip calibration to avoid feedback loops and redundant reset logs
+                if (!hasLocalActive && !isRemoteActive) {
+                    Log.d(TAG, "Both local and remote are IDLE. Skipping redundant calibration.")
+                    return
+                }
+
                 // If remote is active from another device, yield commander role to become follower
                 if (isRemoteActive && cmdDevice.isNotEmpty() && cmdDevice != "None" && cmdDevice != myDevice) {
                     Log.d(TAG, "Received update from active remote device '$cmdDevice'. Yielding commander role.")
@@ -478,6 +484,11 @@ object DynamicCommandManager {
 
             if (hasLocalActive && !isRemoteActive) {
                 Log.d(TAG, "forceReadActiveFocusTimerAndCalibrate: Local device is actively running timer as commander, remote is IDLE. Skipping calibration.")
+                return@addOnSuccessListener
+            }
+
+            if (!hasLocalActive && !isRemoteActive) {
+                Log.d(TAG, "forceReadActiveFocusTimerAndCalibrate: Both local and remote are IDLE. Skipping calibration.")
                 return@addOnSuccessListener
             }
 
@@ -755,8 +766,12 @@ object DynamicCommandManager {
                         }
                     }
                     "idle" -> {
-                        com.example.util.FocusTimerManager.resetStopwatch(context, saveSession = false)
-                        com.example.util.FocusTimerManager.resetTimer(context, saveSession = false)
+                        if (com.example.util.FocusTimerManager.isTimerRunning.value ||
+                            com.example.util.FocusTimerManager.isStopwatchActive.value ||
+                            com.example.util.FocusTimerManager.isPaused.value) {
+                            com.example.util.FocusTimerManager.resetStopwatch(context, saveSession = false)
+                            com.example.util.FocusTimerManager.resetTimer(context, saveSession = false)
+                        }
                         val email = activeEmail
                         if (email.isNotEmpty()) {
                             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
@@ -838,8 +853,12 @@ object DynamicCommandManager {
                         }
                     }
                     "idle" -> {
-                        com.example.util.FocusTimerManager.resetTimer(context, saveSession = false)
-                        com.example.util.FocusTimerManager.resetStopwatch(context, saveSession = false)
+                        if (com.example.util.FocusTimerManager.isTimerRunning.value ||
+                            com.example.util.FocusTimerManager.isStopwatchActive.value ||
+                            com.example.util.FocusTimerManager.isPaused.value) {
+                            com.example.util.FocusTimerManager.resetTimer(context, saveSession = false)
+                            com.example.util.FocusTimerManager.resetStopwatch(context, saveSession = false)
+                        }
                         val email = activeEmail
                         if (email.isNotEmpty()) {
                             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {

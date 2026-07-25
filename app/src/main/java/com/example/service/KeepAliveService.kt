@@ -142,7 +142,7 @@ class KeepAliveService : Service() {
                 com.example.util.FocusTimerManager.isPaused,
                 com.example.util.FocusTimerManager.isTabFocusTimerSelected,
                 com.example.util.FocusTimerManager.isFocusPhase
-            ) { flows ->
+            ) { _ ->
                 Unit
             }.collect {
                 updateNotificationDirectly()

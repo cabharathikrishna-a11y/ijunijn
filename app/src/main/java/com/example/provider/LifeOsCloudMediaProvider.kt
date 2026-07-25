@@ -155,7 +155,7 @@ class LifeOsCloudMediaProvider : CloudMediaProvider() {
         // Sort reverse chronological
         items.sortedByDescending { it.dateTakenMillis }.take(pageSize).forEach { item ->
             cursor.addRow(
-                arrayOf(
+                arrayOf<Any?>(
                     item.id,
                     item.mimeType,
                     item.dateTakenMillis,
@@ -209,7 +209,7 @@ class LifeOsCloudMediaProvider : CloudMediaProvider() {
 
         cloudAlbums.sortedByDescending { it.dateTakenMillis }.forEach { album ->
             cursor.addRow(
-                arrayOf(
+                arrayOf<Any?>(
                     album.id,
                     album.displayName,
                     album.dateTakenMillis,

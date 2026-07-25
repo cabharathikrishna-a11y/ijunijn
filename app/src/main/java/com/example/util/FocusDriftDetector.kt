@@ -151,6 +151,16 @@ object FocusDriftDetector {
                     .child(sanitizedEmail)
                     .child("ACTIVE_FOCUS_TIMER")
 
+                val currentSnap = try { activeRef.get().await() } catch (e: Exception) { null }
+                if (currentSnap != null && currentSnap.exists()) {
+                    val status = currentSnap.child("Status").getValue(String::class.java) ?: "IDLE"
+                    val cmdDev = currentSnap.child("Command_Device_Name").getValue(String::class.java) ?: "None"
+                    if (status.equals("IDLE", ignoreCase = true) && (cmdDev == "None" || cmdDev.isEmpty())) {
+                        Log.d(TAG, "ensureRtdbIdleState: RTDB is already IDLE. Skipping redundant update.")
+                        return
+                    }
+                }
+
                 val idlePayload = mapOf<String, Any?>(
                     "Command_Device_Name" to "None",
                     "Status" to "IDLE",
