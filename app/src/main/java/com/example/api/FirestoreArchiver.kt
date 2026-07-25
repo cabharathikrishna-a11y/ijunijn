@@ -184,10 +184,42 @@ object FirestoreArchiver {
                 } catch (e: Exception) {
                     Log.w(TAG, "Error querying focus_history for $eKey: ${e.message}")
                 }
-            }
 
-            if (documentsMap.isEmpty()) {
-                return Pair(true, "No records found in Firestore")
+                // Query daily_records/{date}/sessions
+                try {
+                    val snapDaily = suspendCancellableCoroutine<com.google.firebase.firestore.QuerySnapshot?> { cont ->
+                        firestore.collection("users").document(eKey)
+                            .collection("daily_records")
+                            .get()
+                            .addOnCompleteListener { task ->
+                                if (task.isSuccessful) cont.resume(task.result) else cont.resume(null)
+                            }
+                    }
+                    snapDaily?.documents?.forEach { dateDoc ->
+                        val dateStr = dateDoc.id
+                        try {
+                            val snapSessions = suspendCancellableCoroutine<com.google.firebase.firestore.QuerySnapshot?> { cont ->
+                                firestore.collection("users").document(eKey)
+                                    .collection("daily_records").document(dateStr)
+                                    .collection("sessions")
+                                    .get()
+                                    .addOnCompleteListener { task ->
+                                        if (task.isSuccessful) cont.resume(task.result) else cont.resume(null)
+                                    }
+                            }
+                            snapSessions?.documents?.forEach { doc ->
+                                val sId = doc.getString("Session_ID") ?: doc.getString("recordId") ?: doc.id
+                                if (sId.isNotEmpty() && !documentsMap.containsKey(sId)) {
+                                    documentsMap[sId] = doc
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error querying daily_records/$dateStr/sessions for $eKey: ${e.message}")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error querying daily_records for $eKey: ${e.message}")
+                }
             }
 
             val db = AppDatabase.getInstance(context)
@@ -199,6 +231,74 @@ object FirestoreArchiver {
                     db.localHistoryVaultDao().insertRecord(vaultRecord)
                     count++
                 }
+            }
+
+            // Check if there is still a discrepancy between max cloud focus time and local DB focus records for today
+            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+            val allHistory = db.localHistoryVaultDao().getAllHistoryDirect()
+            val localTodayMs = allHistory.filter { it.date_string == todayStr }.sumOf { it.total_focus_ms }
+
+            var maxCloudTodayMs = 0L
+            val dbUrl = FirebaseConfig.getDatabaseUrl(context)
+            if (dbUrl.isNotEmpty()) {
+                try {
+                    val database = com.google.firebase.database.FirebaseDatabase.getInstance(dbUrl)
+                    val devicesRef = database.getReference("FOCUS_TIMMER")
+                        .child("USER")
+                        .child(sanitizedEmail)
+                        .child("DEVICES_LOGGED_IN")
+                    val snapshot = suspendCancellableCoroutine<com.google.firebase.database.DataSnapshot?> { cont ->
+                        devicesRef.get().addOnCompleteListener { task ->
+                            if (task.isSuccessful) cont.resume(task.result) else cont.resume(null)
+                        }
+                    }
+                    if (snapshot != null && snapshot.exists()) {
+                        for (devChild in snapshot.children) {
+                            val lastUpdateStr = devChild.child("Last_Update_Time_and_Date").getValue(String::class.java)
+                                ?: devChild.child("Last_Stats_Updated").getValue(String::class.java)
+                                ?: ""
+                            val lastUpdateDate = if (lastUpdateStr.isNotEmpty()) lastUpdateStr.substringBefore(" ").substringBefore("T") else ""
+                            if (lastUpdateDate == todayStr || lastUpdateDate.isEmpty()) {
+                                val tMs = devChild.child("Todays_Focus_Ms").getValue(Long::class.java)
+                                    ?: devChild.child("todayFocusMs").getValue(Long::class.java)
+                                    ?: ((devChild.child("Todays_Total_Focus_Seconds").getValue(Long::class.java) ?: 0L) * 1000L)
+                                if (tMs > maxCloudTodayMs) {
+                                    maxCloudTodayMs = tMs
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error checking RTDB max cloud focus time: ${e.message}")
+                }
+            }
+
+            val diffMs = maxCloudTodayMs - localTodayMs
+            if (diffMs >= 10_000L) {
+                val nowMs = System.currentTimeMillis()
+                val startMs = maxOf(0L, nowMs - diffMs)
+                val sdfTime = SimpleDateFormat("HH:mm:ss", Locale.US)
+                val syncRecordId = "synced_cloud_${todayStr}_${nowMs}"
+                val syntheticRecord = LocalHistoryVault(
+                    record_id = syncRecordId,
+                    date_string = todayStr,
+                    subject = "Cloud Focus",
+                    task_title = "Cloud Synced Focus Session",
+                    start_time_ms = startMs,
+                    end_time_ms = nowMs,
+                    total_focus_ms = diffMs,
+                    total_break_ms = 0L,
+                    pause_count = 0,
+                    duration_formatted = com.example.util.TimeEngine.formatDuration(diffMs),
+                    start_time_formatted = sdfTime.format(Date(startMs)),
+                    end_time_formatted = sdfTime.format(Date(nowMs)),
+                    is_synced_to_firestore = 1,
+                    mode = "POMODORO",
+                    userEmail = sanitizedEmail
+                )
+                db.localHistoryVaultDao().insertRecord(syntheticRecord)
+                count++
+                Log.i(TAG, "Created local history vault record for cloud focus discrepancy: ${diffMs / 1000}s")
             }
 
             Log.d(TAG, "Successfully pulled and synced $count records from Firestore to SQLite.")

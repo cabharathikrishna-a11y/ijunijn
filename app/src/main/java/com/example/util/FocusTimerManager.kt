@@ -3650,9 +3650,28 @@ object FocusTimerManager {
                         userEmail = record.userEmail
                     )
                 }
+                val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+                val todayRecords = filteredHistory.filter { it.date_string == todayStr }
+                val todayMs = todayRecords.sumOf { it.total_focus_ms }
+
+                val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                val savedAdoptedDate = if (currentEmail.isNotEmpty()) prefs.getString("adopted_today_date_${currentEmail}", "") else ""
+                val adoptedMs = if (savedAdoptedDate == todayStr && currentEmail.isNotEmpty()) {
+                    prefs.getLong("adopted_today_ms_${currentEmail}", 0L)
+                } else 0L
+
+                val totalMins = ((todayMs + adoptedMs) / 1000 / 60).toInt()
+                val totalPomos = todayRecords.size
+
                 withContext(Dispatchers.Main) {
                     _focusRecords.value = mapped
+                    _totalFocusMinutes.value = totalMins
+                    _todayPomosCount.value = totalPomos
                 }
+                prefs.edit()
+                    .putInt("total_focus_minutes", totalMins)
+                    .putInt("today_pomos_count", totalPomos)
+                    .apply()
                 saveFocusRecords(context, mapped)
             } catch (e: Exception) {
                 Log.e("FocusTimerManager", "Error reloading focus records from DB", e)
@@ -4033,19 +4052,21 @@ object FocusTimerManager {
 
                 // 3. Recalculate and commit correct authoritative totals to memory and preferences
                 setOptimisticTodayFocusSeconds(null)
-                setAdoptedTodayMs(0L)
+                val prefs = appContext.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                val activeEmailClean = com.example.api.DevicePresenceManager.sanitizeEmail(com.example.api.DynamicCommandManager.activeEmail)
+                val savedAdoptedDate = if (activeEmailClean.isNotEmpty()) prefs.getString("adopted_today_date_${activeEmailClean}", "") else ""
+                val adoptedTodayMsVal = if (savedAdoptedDate == todayStr && activeEmailClean.isNotEmpty()) {
+                    prefs.getLong("adopted_today_ms_${activeEmailClean}", 0L)
+                } else 0L
+
+                setAdoptedTodayMs(adoptedTodayMsVal)
+
                 val healedVaultRecords = db.localHistoryVaultDao().getAllHistoryDirect()
                     .filter { it.date_string == todayStr }
                 
-                val correctTotalMs = healedVaultRecords.sumOf { it.total_focus_ms }
+                val correctTotalMs = healedVaultRecords.sumOf { it.total_focus_ms } + adoptedTodayMsVal
                 val correctTotalMinutes = (correctTotalMs / 1000 / 60).toInt()
                 val correctTodayPomosCount = healedVaultRecords.size
-
-                val prefs = appContext.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-                val activeEmailClean = com.example.api.DevicePresenceManager.sanitizeEmail(com.example.api.DynamicCommandManager.activeEmail)
-                if (activeEmailClean.isNotEmpty()) {
-                    prefs.edit().putLong("adopted_today_ms_${activeEmailClean}", 0L).apply()
-                }
 
                 withContext(Dispatchers.Main) {
                     _totalFocusMinutes.value = correctTotalMinutes
