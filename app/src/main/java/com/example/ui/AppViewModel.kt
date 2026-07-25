@@ -307,7 +307,7 @@ class AppViewModel(
     }
 
     fun triggerHistoryPullAndSync(context: android.content.Context) {
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             _isRefreshingHistory.value = true
             val email = if (_userEmail.value.isNotEmpty()) _userEmail.value else com.example.api.DynamicCommandManager.activeEmail
             if (email.isNotEmpty()) {
@@ -316,8 +316,10 @@ class AppViewModel(
                 } catch (e: Exception) {
                     android.util.Log.e("AppViewModel", "Failed to adopt highest focus during manual sync", e)
                 }
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
                     com.example.api.FirestoreArchiver.pullAndSyncFocusHistoryFromFirestore(context, email)
+                } catch (e: Exception) {
+                    android.util.Log.e("AppViewModel", "Failed to pull and sync focus history", e)
                 }
             }
             _isRefreshingHistory.value = false

@@ -39,7 +39,7 @@ object ArenaLeaderboardEngine {
     private var friendsRef: com.google.firebase.database.DatabaseReference? = null
     private val activeWeeklyListeners = mutableMapOf<String, Pair<com.google.firebase.database.DatabaseReference, ValueEventListener>>()
 
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var peerStatesCollectJob: Job? = null
 
     // Temporary storage for individual peer raw weekly stats

@@ -30,7 +30,7 @@ object PeerLiveSphereManager {
     private var sharedRoomsRef: DatabaseReference? = null
     private var sharedRoomsListener: ValueEventListener? = null
 
-    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob())
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
     private var roomCollectJob: kotlinx.coroutines.Job? = null
 
     private var regularFriends = emptyList<String>()

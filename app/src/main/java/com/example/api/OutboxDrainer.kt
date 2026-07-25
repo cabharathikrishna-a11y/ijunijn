@@ -182,7 +182,11 @@ object OutboxDrainer {
     }
 
     suspend fun processQueue(context: Context, items: List<OutboxQueue>) {
-        processMutex.withLock {
+        if (!processMutex.tryLock()) {
+            Log.d("OutboxDrainer", "Outbox drain is already in progress, skipping concurrent duplicate run.")
+            return
+        }
+        try {
             val db = AppDatabase.getInstance(context)
             val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
             val username = prefs.getString("current_username", null)
@@ -209,9 +213,6 @@ object OutboxDrainer {
                 return
             }
 
-            var currentDelayMs = 2000L
-            val maxDelayMs = 60000L // Cap at 1 minute
-
             val timerDao = db.outboxQueueDao()
             var anySuccess = false
             for (item in currentItems) {
@@ -230,7 +231,10 @@ object OutboxDrainer {
                 
                 var success = false
                 try {
-                    success = uploadItem(context, username, item)
+                    val result = kotlinx.coroutines.withTimeoutOrNull(10000L) {
+                        uploadItem(context, username, item)
+                    }
+                    success = result == true
                 } catch (e: Exception) {
                     Log.e("OutboxDrainer", "Error uploading queue item ${item.queue_id}", e)
                 }
@@ -238,7 +242,6 @@ object OutboxDrainer {
                 if (success) {
                     timerDao.deleteQueueItemById(item.queue_id)
                     Log.d("OutboxDrainer", "Successfully processed and deleted queue item ${item.queue_id}")
-                    currentDelayMs = 2000L // Reset delay on success
                     anySuccess = true
                 } else {
                     timerDao.incrementRetryCount(item.queue_id)
@@ -250,15 +253,11 @@ object OutboxDrainer {
                         timerDao.updateStatus(item.queue_id, "PENDING")
                         Log.d("OutboxDrainer", "Queue item ${item.queue_id} failed. Status reset to PENDING.")
                     }
-                    
-                    Log.d("OutboxDrainer", "[Outbox] Upload failed. Backing off for ${currentDelayMs}ms")
-                    delay(currentDelayMs)
-                    currentDelayMs = minOf(currentDelayMs * 2, maxDelayMs) // Double the wait time
+                    Log.d("OutboxDrainer", "[Outbox] Upload failed for queue item ${item.queue_id}. Will retry in next loop iteration.")
                 }
             }
             if (anySuccess) {
                 Log.d("OutboxDrainer", "Drained outbox successfully. Pinging profile update bypassed.")
-                // Firebase.triggerProfileUpdated(context, username)
             }
 
             // Re-evaluate pending queue items. If empty, update upload status to COMPLETED
@@ -275,6 +274,8 @@ object OutboxDrainer {
                     }
                 }
             }
+        } finally {
+            processMutex.unlock()
         }
     }
 

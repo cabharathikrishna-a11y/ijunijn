@@ -64,7 +64,7 @@ object SmartUpdateManager {
     var activeForceUpdateConfig: SmartUpdateStatus.NewVersionAvailable? = null
     var latestAvailableVersion: SmartUpdateStatus.NewVersionAvailable? = null
 
-    private val updateScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val updateScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val okHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)

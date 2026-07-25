@@ -64,7 +64,7 @@ object AppUpdateManager {
     @Volatile
     private var isDownloadingActive = false
 
-    private val updateScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val updateScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Kicks off update check asynchronously in a global, non-cancellable scope.
