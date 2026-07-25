@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
 import androidx.room.Room
 import com.example.ui.theme.PremiumEffects.bouncyClick
 import com.example.data.AppDatabase
@@ -71,19 +72,19 @@ class MainActivity : ComponentActivity() {
     private lateinit var database: AppDatabase
     private lateinit var repository: LocalRepository
     private val viewModel: AppViewModel by viewModels {
-        object : androidx.lifecycle.AbstractSavedStateViewModelFactory(this, null) {
+        object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(
-                key: String,
                 modelClass: Class<T>,
-                handle: androidx.lifecycle.SavedStateHandle
+                extras: androidx.lifecycle.viewmodel.CreationExtras
             ): T {
                 if (modelClass.isAssignableFrom(AppViewModel::class.java)) {
+                    val handle = extras.createSavedStateHandle()
                     val db = AppDatabase.getInstance(applicationContext)
                     val repo = LocalRepository(db, applicationContext)
                     @Suppress("UNCHECKED_CAST")
                     return AppViewModel(application, repo, handle) as T
                 }
-                throw IllegalArgumentException("Unknown ViewModel class")
+                throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
             }
         }
     }

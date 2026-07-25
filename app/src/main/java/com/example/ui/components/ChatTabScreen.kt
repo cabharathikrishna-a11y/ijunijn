@@ -1213,7 +1213,13 @@ fun ChatTabScreen(
                             ) {
                                 // Camera Button
                                 IconButton(
-                                    onClick = { takePhotoLauncher.launch(null) },
+                                    onClick = {
+                                        try {
+                                            takePhotoLauncher.launch(null)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Cannot open camera: ${e.localizedMessage ?: "App or permission missing"}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
                                     modifier = Modifier.size(28.dp)
                                 ) {
                                     Icon(
@@ -1344,7 +1350,11 @@ fun ChatTabScreen(
                     OutlinedButton(
                         onClick = {
                             showAttachmentSheet = false
-                            takePhotoLauncher.launch(null)
+                            try {
+                                takePhotoLauncher.launch(null)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Cannot open camera: ${e.localizedMessage ?: "App or permission missing"}", Toast.LENGTH_SHORT).show()
+                            }
                         },
                         border = BorderStroke(1.dp, sendButtonBg),
                         modifier = Modifier.fillMaxWidth()

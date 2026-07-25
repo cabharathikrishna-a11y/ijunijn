@@ -114,6 +114,7 @@
             android:name="com.example.provider.LifeOsCloudMediaProvider"
             android:authorities="${applicationId}.cloudmediaprovider"
             android:permission="com.android.providers.media.permission.MANAGE_CLOUD_MEDIA_PROVIDERS"
+            android:enabled="false"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.content.action.CLOUD_MEDIA_PROVIDER" />

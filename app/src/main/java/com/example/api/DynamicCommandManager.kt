@@ -123,12 +123,6 @@ object DynamicCommandManager {
             return
         }
 
-        val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-        // Since we are triggering a local user command action on this device,
-        // we automatically assume/claim the commanding role!
-        prefs.edit().putBoolean("is_command_device", true).apply()
-        val isLocalCommander = true
-
         val myDevice = com.example.util.DeviceIdProvider.getDeviceId(context)
         val trueTime = com.example.util.StableTime.currentTimeMillis()
 
@@ -142,6 +136,24 @@ object DynamicCommandManager {
             "end", "completed" -> "END"
             else -> action.uppercase().trim()
         }
+
+        val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        // Since we are triggering a local user command action on this device,
+        // we automatically assume/claim the commanding role!
+        val editor = prefs.edit().putBoolean("is_command_device", true)
+        if (mappedAction == "START" || mappedAction == "RESUME") {
+            if (timerMode.lowercase() == "stopwatch") {
+                editor.putBoolean("timer_is_stopwatch_active", true).putBoolean("timer_is_running", false).putBoolean("is_paused", false)
+            } else {
+                editor.putBoolean("timer_is_running", true).putBoolean("timer_is_stopwatch_active", false).putBoolean("is_paused", false)
+            }
+        } else if (mappedAction == "PAUSE") {
+            editor.putBoolean("is_paused", true)
+        } else if (mappedAction == "END") {
+            editor.putBoolean("timer_is_running", false).putBoolean("timer_is_stopwatch_active", false).putBoolean("is_paused", false)
+        }
+        editor.apply()
+        val isLocalCommander = true
 
         // Create a new TimelineEvent with standard UPPERCASE command
         val newEvent = TimelineEvent(deviceId = myDevice, event = mappedAction, timestamp = trueTime)
@@ -341,7 +353,12 @@ object DynamicCommandManager {
 
                 // If this update is from ourselves, we skip it to prevent echo loops, UNLESS remote status has transitioned to IDLE/Ended
                 if (cmdDevice == myDevice) {
-                    var hasLocalActive = prefs.getBoolean("timer_is_running", false) || prefs.getBoolean("timer_is_stopwatch_active", false) || prefs.getBoolean("is_paused", false)
+                    var hasLocalActive = com.example.util.FocusTimerManager.isTimerRunning.value ||
+                        com.example.util.FocusTimerManager.isStopwatchActive.value ||
+                        com.example.util.FocusTimerManager.isPaused.value ||
+                        prefs.getBoolean("timer_is_running", false) ||
+                        prefs.getBoolean("timer_is_stopwatch_active", false) ||
+                        prefs.getBoolean("is_paused", false)
                     if (!hasLocalActive) {
                         try {
                             val db = com.example.data.AppDatabase.getInstance(appContext)
@@ -475,7 +492,12 @@ object DynamicCommandManager {
             var isLocalCommander = prefs.getBoolean("is_command_device", true)
 
             if (cmdDevice == myDevice) {
-                var hasLocalActive = prefs.getBoolean("timer_is_running", false) || prefs.getBoolean("timer_is_stopwatch_active", false) || prefs.getBoolean("is_paused", false)
+                var hasLocalActive = com.example.util.FocusTimerManager.isTimerRunning.value ||
+                    com.example.util.FocusTimerManager.isStopwatchActive.value ||
+                    com.example.util.FocusTimerManager.isPaused.value ||
+                    prefs.getBoolean("timer_is_running", false) ||
+                    prefs.getBoolean("timer_is_stopwatch_active", false) ||
+                    prefs.getBoolean("is_paused", false)
                 if (!hasLocalActive) {
                     try {
                         val db = com.example.data.AppDatabase.getInstance(appContext)

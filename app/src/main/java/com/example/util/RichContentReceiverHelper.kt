@@ -30,7 +30,6 @@ object RichContentReceiverHelper {
         "video/*",
         "audio/*",
         "application/pdf",
-        "application/*",
         "text/*"
     )
 
@@ -79,8 +78,11 @@ object RichContentReceiverHelper {
         mimeTypes: Array<String> = SUPPORTED_MIME_TYPES,
         callback: OnRichContentCallback
     ) {
-        val listener = AppRichContentListener(callback)
-        ViewCompat.setOnReceiveContentListener(view, mimeTypes, listener)
+        val validMimeTypes = mimeTypes.filter { !it.startsWith("*") && it.contains("/") }.toTypedArray()
+        if (validMimeTypes.isNotEmpty()) {
+            val listener = AppRichContentListener(callback)
+            ViewCompat.setOnReceiveContentListener(view, validMimeTypes, listener)
+        }
     }
 }
 

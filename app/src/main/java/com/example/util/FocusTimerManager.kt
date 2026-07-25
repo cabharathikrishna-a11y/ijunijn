@@ -1324,6 +1324,7 @@ object FocusTimerManager {
             }
 
             _isTimerRunning.value = true
+            saveActiveSessionState(appContext)
             // --- POMODORO FOCUS MODE (Timestamp Engine) ---
             val isResumingSession = actualResuming || _accumulatedSessionTimeMs.value > 0L || (_timerSecondsLeft.value < _timerDurationMinutes.value * 60)
             val email = com.example.api.DynamicCommandManager.activeEmail
@@ -2105,6 +2106,7 @@ object FocusTimerManager {
         if (_isStopwatchActive.value) return
         updateLocalInteractionTimestamp()
         _isStopwatchActive.value = true
+        saveActiveSessionState(appContext)
         val isResumingSession = actualResuming || _accumulatedSessionTimeMs.value > 0L || _stopwatchSeconds.value > 0
         val email = com.example.api.DynamicCommandManager.activeEmail
         if (email.isNotEmpty()) {

@@ -18,6 +18,17 @@ class MainApplication : Application(), Configuration.Provider {
         com.example.util.AppCrashRollbackManager.initialize(this)
         com.example.api.Firebase.ensureFirebaseInitialized(this)
         com.example.util.UrgentNotificationHelper.initChannels(this)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            try {
+                packageManager.setComponentEnabledSetting(
+                    android.content.ComponentName(this, "com.example.provider.LifeOsCloudMediaProvider"),
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                    android.content.pm.PackageManager.DONT_KILL_APP
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("MainApp", "Could not enable LifeOsCloudMediaProvider", e)
+            }
+        }
     }
 
     companion object {

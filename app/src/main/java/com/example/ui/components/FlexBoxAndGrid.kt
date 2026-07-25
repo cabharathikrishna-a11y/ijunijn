@@ -174,11 +174,11 @@ fun FlexBox(
                     item.baseSizePx = (available * basis.value).toInt()
                 }
                 FlexBasis.Auto -> {
-                    val placeableDummy = item.measurable.measure(
-                        if (isHorizontal) Constraints(maxWidth = constraints.maxWidth)
-                        else Constraints(maxHeight = constraints.maxHeight)
-                    )
-                    item.baseSizePx = if (isHorizontal) placeableDummy.width else placeableDummy.height
+                    item.baseSizePx = if (isHorizontal) {
+                        item.measurable.maxIntrinsicWidth(if (constraints.hasBoundedHeight) constraints.maxHeight else Constraints.Infinity)
+                    } else {
+                        item.measurable.maxIntrinsicHeight(if (constraints.hasBoundedWidth) constraints.maxWidth else Constraints.Infinity)
+                    }
                 }
             }
             item

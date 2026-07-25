@@ -63,56 +63,56 @@ class ChatViewModel(
 
     private val initialDirectMessageMembers = emptyList<ChatOption>()
 
-    private val _studyGroups: MutableStateFlow<List<ChatOption>>? = MutableStateFlow(initialStudyGroups)
-    val studyGroups: StateFlow<List<ChatOption>> = _studyGroups?.asStateFlow() ?: MutableStateFlow(initialStudyGroups).asStateFlow()
+    private val _studyGroups = MutableStateFlow(initialStudyGroups)
+    val studyGroups: StateFlow<List<ChatOption>> = _studyGroups.asStateFlow()
 
-    private val _directMessageMembers: MutableStateFlow<List<ChatOption>>? = MutableStateFlow(initialDirectMessageMembers)
-    val directMessageMembers: StateFlow<List<ChatOption>> = _directMessageMembers?.asStateFlow() ?: MutableStateFlow(initialDirectMessageMembers).asStateFlow()
+    private val _directMessageMembers = MutableStateFlow(initialDirectMessageMembers)
+    val directMessageMembers: StateFlow<List<ChatOption>> = _directMessageMembers.asStateFlow()
 
-    private val _selectedChatOption: MutableStateFlow<ChatOption>? = MutableStateFlow(initialStudyGroups[0])
-    val selectedChatOption: StateFlow<ChatOption> = _selectedChatOption?.asStateFlow() ?: MutableStateFlow(initialStudyGroups[0]).asStateFlow()
+    private val _selectedChatOption = MutableStateFlow(initialStudyGroups[0])
+    val selectedChatOption: StateFlow<ChatOption> = _selectedChatOption.asStateFlow()
 
-    private val _showChatOptionsSheet: MutableStateFlow<Boolean>? = MutableStateFlow(false)
-    val showChatOptionsSheet: StateFlow<Boolean> = _showChatOptionsSheet?.asStateFlow() ?: MutableStateFlow(false).asStateFlow()
+    private val _showChatOptionsSheet = MutableStateFlow(false)
+    val showChatOptionsSheet: StateFlow<Boolean> = _showChatOptionsSheet.asStateFlow()
 
-    private val _messages: MutableStateFlow<List<ChatMessage>>? = MutableStateFlow(emptyList())
-    val messages: StateFlow<List<ChatMessage>> = _messages?.asStateFlow() ?: MutableStateFlow(emptyList<ChatMessage>()).asStateFlow()
+    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
-    private val _searchQuery: MutableStateFlow<String>? = MutableStateFlow("")
-    val searchQuery: StateFlow<String> = _searchQuery?.asStateFlow() ?: MutableStateFlow("").asStateFlow()
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _selectedSenderFilter: MutableStateFlow<String?>? = MutableStateFlow(null)
-    val selectedSenderFilter: StateFlow<String?> = _selectedSenderFilter?.asStateFlow() ?: MutableStateFlow<String?>(null).asStateFlow()
+    private val _selectedSenderFilter = MutableStateFlow<String?>(null)
+    val selectedSenderFilter: StateFlow<String?> = _selectedSenderFilter.asStateFlow()
 
-    private val _selectedDateRangeFilter: MutableStateFlow<ChatDateRangeFilter>? = MutableStateFlow(ChatDateRangeFilter.ALL)
-    val selectedDateRangeFilter: StateFlow<ChatDateRangeFilter> = _selectedDateRangeFilter?.asStateFlow() ?: MutableStateFlow(ChatDateRangeFilter.ALL).asStateFlow()
+    private val _selectedDateRangeFilter = MutableStateFlow(ChatDateRangeFilter.ALL)
+    val selectedDateRangeFilter: StateFlow<ChatDateRangeFilter> = _selectedDateRangeFilter.asStateFlow()
 
-    private val _isSearchActive: MutableStateFlow<Boolean>? = MutableStateFlow(false)
-    val isSearchActive: StateFlow<Boolean> = _isSearchActive?.asStateFlow() ?: MutableStateFlow(false).asStateFlow()
+    private val _isSearchActive = MutableStateFlow(false)
+    val isSearchActive: StateFlow<Boolean> = _isSearchActive.asStateFlow()
 
-    private val _presenceMap: MutableStateFlow<Map<String, UserPresence>>? = MutableStateFlow(emptyMap())
-    val presenceMap: StateFlow<Map<String, UserPresence>> = _presenceMap?.asStateFlow() ?: MutableStateFlow(emptyMap<String, UserPresence>()).asStateFlow()
+    private val _presenceMap = MutableStateFlow<Map<String, UserPresence>>(emptyMap())
+    val presenceMap: StateFlow<Map<String, UserPresence>> = _presenceMap.asStateFlow()
 
-    private val _replyingToMessage: MutableStateFlow<ChatMessage?>? = MutableStateFlow(null)
-    val replyingToMessage: StateFlow<ChatMessage?> = _replyingToMessage?.asStateFlow() ?: MutableStateFlow<ChatMessage?>(null).asStateFlow()
+    private val _replyingToMessage = MutableStateFlow<ChatMessage?>(null)
+    val replyingToMessage: StateFlow<ChatMessage?> = _replyingToMessage.asStateFlow()
 
-    private val _selectedMessageIds: MutableStateFlow<Set<Long>>? = MutableStateFlow(emptySet())
-    val selectedMessageIds: StateFlow<Set<Long>> = _selectedMessageIds?.asStateFlow() ?: MutableStateFlow(emptySet<Long>()).asStateFlow()
+    private val _selectedMessageIds = MutableStateFlow<Set<Long>>(emptySet())
+    val selectedMessageIds: StateFlow<Set<Long>> = _selectedMessageIds.asStateFlow()
 
-    private val _isMultiSelectActive: MutableStateFlow<Boolean>? = MutableStateFlow(false)
-    val isMultiSelectActive: StateFlow<Boolean> = _isMultiSelectActive?.asStateFlow() ?: MutableStateFlow(false).asStateFlow()
+    private val _isMultiSelectActive = MutableStateFlow(false)
+    val isMultiSelectActive: StateFlow<Boolean> = _isMultiSelectActive.asStateFlow()
 
-    private val _isLoading: MutableStateFlow<Boolean>? = MutableStateFlow(true)
-    val isLoading: StateFlow<Boolean> = _isLoading?.asStateFlow() ?: MutableStateFlow(true).asStateFlow()
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _isLoadingMore: MutableStateFlow<Boolean>? = MutableStateFlow(false)
-    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore?.asStateFlow() ?: MutableStateFlow(false).asStateFlow()
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
 
-    private val _errorMessage: MutableStateFlow<String?>? = MutableStateFlow(null)
-    val errorMessage: StateFlow<String?> = _errorMessage?.asStateFlow() ?: MutableStateFlow<String?>(null).asStateFlow()
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    private val _editingMessage: MutableStateFlow<ChatMessage?>? = MutableStateFlow(null)
-    val editingMessage: StateFlow<ChatMessage?> = _editingMessage?.asStateFlow() ?: MutableStateFlow<ChatMessage?>(null).asStateFlow()
+    private val _editingMessage = MutableStateFlow<ChatMessage?>(null)
+    val editingMessage: StateFlow<ChatMessage?> = _editingMessage.asStateFlow()
 
     private var currentLimit = 100
     private var canLoadMore = true

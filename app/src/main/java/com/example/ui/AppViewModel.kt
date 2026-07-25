@@ -179,7 +179,7 @@ class AppViewModel(
     fun startListeningToPeersSyllabus() {
         viewModelScope.launch {
             try {
-                val flow = allUsers
+                val flow = try { allUsers } catch (e: Exception) { null }
                 flow?.collect { usersMap ->
                     try {
                         if (usersMap == null) return@collect
