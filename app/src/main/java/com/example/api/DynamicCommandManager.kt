@@ -351,14 +351,30 @@ object DynamicCommandManager {
                     !rawStatus.equals("Ended", ignoreCase = true) &&
                     !rawStatus.equals("Session_End", ignoreCase = true)
 
+                val hasLocalActive = com.example.util.FocusTimerManager.isTimerRunning.value ||
+                    com.example.util.FocusTimerManager.isStopwatchActive.value ||
+                    com.example.util.FocusTimerManager.isPaused.value ||
+                    prefs.getBoolean("timer_is_running", false) ||
+                    prefs.getBoolean("timer_is_stopwatch_active", false) ||
+                    prefs.getBoolean("is_paused", false)
+
                 // If this update is from ourselves, we skip it to prevent echo loops
                 if (cmdDevice == myDevice) {
                     Log.d(TAG, "Local device is the command device ($cmdDevice). Skipping calibration.")
                     return
                 }
 
-                // Since update is from another device (or remote reset), automatically become reading mode!
-                prefs.edit().putBoolean("is_command_device", false).apply()
+                // If local device is actively running a timer and remote is IDLE/None, skip calibration to avoid resetting local timer
+                if (hasLocalActive && !isRemoteActive) {
+                    Log.d(TAG, "Local device is actively running timer as commander, remote is IDLE. Skipping calibration.")
+                    return
+                }
+
+                // If remote is active from another device, yield commander role to become follower
+                if (isRemoteActive && cmdDevice.isNotEmpty() && cmdDevice != "None" && cmdDevice != myDevice) {
+                    Log.d(TAG, "Received update from active remote device '$cmdDevice'. Yielding commander role.")
+                    prefs.edit().putBoolean("is_command_device", false).apply()
+                }
 
                 // If we are a reading device or remote is IDLE/Ended, we sync the timer state live!
                 val cleanRaw = rawStatus.lowercase().trim()
@@ -448,13 +464,27 @@ object DynamicCommandManager {
 
             var isLocalCommander = prefs.getBoolean("is_command_device", true)
 
+            val hasLocalActive = com.example.util.FocusTimerManager.isTimerRunning.value ||
+                com.example.util.FocusTimerManager.isStopwatchActive.value ||
+                com.example.util.FocusTimerManager.isPaused.value ||
+                prefs.getBoolean("timer_is_running", false) ||
+                prefs.getBoolean("timer_is_stopwatch_active", false) ||
+                prefs.getBoolean("is_paused", false)
+
             if (cmdDevice == myDevice) {
                 Log.d(TAG, "forceReadActiveFocusTimerAndCalibrate: Local device is command device ($cmdDevice). Skipping calibration.")
                 return@addOnSuccessListener
             }
 
-            // Remote device update: automatically become reading mode!
-            prefs.edit().putBoolean("is_command_device", false).apply()
+            if (hasLocalActive && !isRemoteActive) {
+                Log.d(TAG, "forceReadActiveFocusTimerAndCalibrate: Local device is actively running timer as commander, remote is IDLE. Skipping calibration.")
+                return@addOnSuccessListener
+            }
+
+            if (isRemoteActive && cmdDevice.isNotEmpty() && cmdDevice != "None" && cmdDevice != myDevice) {
+                Log.d(TAG, "forceReadActiveFocusTimerAndCalibrate: Yielding commander role to '$cmdDevice'")
+                prefs.edit().putBoolean("is_command_device", false).apply()
+            }
 
             val cleanRawForce = rawStatus.lowercase().trim()
             val statusStr = if (cleanRawForce == "relaxing" || cleanRawForce == "end" || cleanRawForce == "completed" || cleanRawForce == "ended" || cleanRawForce == "session_end") "idle" else rawStatus
