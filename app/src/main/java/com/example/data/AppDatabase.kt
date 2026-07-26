@@ -230,6 +230,9 @@ interface JournalDao {
     @Query("SELECT * FROM journal_entries ORDER BY timestamp DESC")
     fun getAllJournalEntries(): Flow<List<JournalEntry>>
 
+    @Query("SELECT * FROM journal_entries ORDER BY timestamp DESC")
+    suspend fun getAllJournalEntriesDirect(): List<JournalEntry>
+
     @Query("SELECT * FROM journal_entries WHERE title LIKE :query OR text LIKE :query")
     fun searchJournalEntries(query: String): Flow<List<JournalEntry>>
 
@@ -244,6 +247,9 @@ interface JournalDao {
 interface LedgerDao {
     @Query("SELECT * FROM ledger_entries ORDER BY timestamp DESC")
     fun getAllLedgerEntries(): Flow<List<LedgerEntry>>
+
+    @Query("SELECT * FROM ledger_entries ORDER BY timestamp DESC")
+    suspend fun getAllLedgerEntriesDirect(): List<LedgerEntry>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLedgerEntry(entry: LedgerEntry)
@@ -313,6 +319,9 @@ data class CustomList(
 interface AppFileDao {
     @Query("SELECT * FROM app_files ORDER BY timestamp DESC")
     fun getAllFiles(): Flow<List<AppFile>>
+
+    @Query("SELECT * FROM app_files ORDER BY timestamp DESC")
+    suspend fun getAllFilesDirect(): List<AppFile>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFile(file: AppFile): Long
@@ -535,6 +544,9 @@ interface HealthRecordDao {
 
     @Query("SELECT * FROM health_records ORDER BY dateString DESC")
     fun getAllHealthRecordsFlow(): Flow<List<HealthRecord>>
+
+    @Query("SELECT * FROM health_records ORDER BY dateString DESC")
+    suspend fun getAllHealthRecordsDirect(): List<HealthRecord>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(record: HealthRecord)

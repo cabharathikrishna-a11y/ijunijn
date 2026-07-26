@@ -19,3 +19,4 @@ dependencyResolutionManagement {
 rootProject.name = "Life OS"
 
 include(":app")
+include(":shared")

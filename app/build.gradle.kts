@@ -75,9 +75,10 @@ android {
     val customCode = project.findProperty("customVersionCode")?.toString()?.toIntOrNull()
     val customName = project.findProperty("customVersionName")?.toString()
 
-    versionCode = customCode ?: 19
-    versionName = customName ?: "19.0"
+    versionCode = customCode ?: 20
+    versionName = customName ?: "20.0"
 
+    multiDexEnabled = true
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     
     val envProps = Properties()
@@ -164,8 +165,8 @@ android {
     }
   }
   compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
   }
   buildFeatures {
     compose = true
@@ -188,6 +189,7 @@ ksp {
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
+  implementation(project(":shared"))
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)

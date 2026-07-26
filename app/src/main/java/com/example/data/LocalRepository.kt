@@ -84,33 +84,53 @@ class LocalRepository(val db: AppDatabase, val context: android.content.Context)
         customListDao.deleteList(list)
     }
 
+    private fun pushLiveSync(action: (email: String) -> Unit) {
+        val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+        val email = prefs.getString("user_email", "") ?: ""
+        if (email.isNotBlank()) {
+            action(email)
+        }
+        triggerAutoBackup()
+    }
+
     // Task Operations
     val allTasks: Flow<List<Task>> = taskDao.getAllTasks()
     
     suspend fun insertTask(task: Task): Long = withContext(NonCancellable) {
         val sanitized = validateAndSanitizeTask(task)
-        if (sanitized.id == 0) {
+        val res = if (sanitized.id == 0) {
             taskDao.insertTask(sanitized)
         } else {
             taskDao.updateTask(sanitized)
             sanitized.id.toLong()
         }
+        pushLiveSync { email ->
+            com.example.api.AppDataLiveSyncEngine.pushTaskToCloud(context, email, sanitized)
+        }
+        res
     }
 
     suspend fun updateTask(task: Task) = withContext(NonCancellable) {
         val sanitized = validateAndSanitizeTask(task)
-        if (sanitized.id == 0) {
+        val res = if (sanitized.id == 0) {
             taskDao.insertTask(sanitized)
         } else {
             taskDao.updateTask(sanitized)
             sanitized.id.toLong()
         }
+        pushLiveSync { email ->
+            com.example.api.AppDataLiveSyncEngine.pushTaskToCloud(context, email, sanitized)
+        }
+        res
     }
 
     suspend fun deleteTask(task: Task) = withContext(NonCancellable) {
         taskDao.deleteTask(task)
         // Also delete subtasks if it's a parent
         taskDao.deleteSubtasks(task.id)
+        pushLiveSync { email ->
+            com.example.api.AppDataLiveSyncEngine.pushTaskToCloud(context, email, task, isDeleted = true)
+        }
     }
 
     suspend fun getTaskById(id: Int): Task? = withContext(Dispatchers.IO) {
@@ -183,11 +203,19 @@ class LocalRepository(val db: AppDatabase, val context: android.content.Context)
 
     suspend fun insertJournal(entry: JournalEntry): Long = withContext(NonCancellable) {
         val sanitized = validateAndSanitizeJournalEntry(entry)
-        journalDao.insertJournalEntry(sanitized)
+        val id = journalDao.insertJournalEntry(sanitized)
+        val saved = sanitized.copy(id = id.toInt())
+        pushLiveSync { email ->
+            com.example.api.AppDataLiveSyncEngine.pushJournalToCloud(context, email, saved)
+        }
+        id
     }
 
     suspend fun deleteJournal(entry: JournalEntry) = withContext(NonCancellable) {
         journalDao.deleteJournalEntry(entry)
+        pushLiveSync { email ->
+            com.example.api.AppDataLiveSyncEngine.pushJournalToCloud(context, email, entry, isDeleted = true)
+        }
     }
 
     private fun validateAndSanitizeJournalEntry(entry: JournalEntry): JournalEntry {
@@ -304,11 +332,19 @@ class LocalRepository(val db: AppDatabase, val context: android.content.Context)
     val allFiles: Flow<List<AppFile>> = appFileDao.getAllFiles()
 
     suspend fun insertFile(file: AppFile): Long = withContext(NonCancellable) {
-        appFileDao.insertFile(file)
+        val id = appFileDao.insertFile(file)
+        val saved = file.copy(id = id.toInt())
+        pushLiveSync { email ->
+            com.example.api.AppDataLiveSyncEngine.pushFileToCloud(context, email, saved)
+        }
+        id
     }
 
     suspend fun deleteFile(file: AppFile) = withContext(NonCancellable) {
         appFileDao.deleteFile(file)
+        pushLiveSync { email ->
+            com.example.api.AppDataLiveSyncEngine.pushFileToCloud(context, email, file, isDeleted = true)
+        }
     }
 
     // Family Ledger Operations
@@ -343,11 +379,19 @@ class LocalRepository(val db: AppDatabase, val context: android.content.Context)
     }
 
     suspend fun insertFinanceTransaction(transaction: FinanceTransaction): Long = withContext(NonCancellable) {
-        financeTransactionDao.insertTransaction(transaction)
+        val id = financeTransactionDao.insertTransaction(transaction)
+        val saved = transaction.copy(id = id.toInt())
+        pushLiveSync { email ->
+            com.example.api.AppDataLiveSyncEngine.pushFinanceToCloud(context, email, saved)
+        }
+        id
     }
 
     suspend fun deleteFinanceTransaction(transaction: FinanceTransaction) = withContext(NonCancellable) {
         financeTransactionDao.deleteTransaction(transaction)
+        pushLiveSync { email ->
+            com.example.api.AppDataLiveSyncEngine.pushFinanceToCloud(context, email, transaction, isDeleted = true)
+        }
     }
 
     suspend fun insertFinanceCategory(category: FinanceCategory): Long = withContext(NonCancellable) {
@@ -419,6 +463,9 @@ class LocalRepository(val db: AppDatabase, val context: android.content.Context)
 
     suspend fun insertOrUpdateHealthRecord(record: HealthRecord) = withContext(NonCancellable) {
         healthRecordDao.insertOrUpdate(record)
+        pushLiveSync { email ->
+            com.example.api.AppDataLiveSyncEngine.pushHealthToCloud(context, email, record)
+        }
     }
 
     suspend fun clearAllHealthRecords() = withContext(NonCancellable) {

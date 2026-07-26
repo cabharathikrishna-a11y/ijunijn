@@ -266,19 +266,23 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 
+                val isLoggedInState by viewModel.isLoggedIn.collectAsStateWithLifecycle()
+
                 var showSocialOnboarding by remember {
                     mutableStateOf(false)
                 }
-                LaunchedEffect(Unit) {
-                    // Request Notification Permission on Android 13+ (API 33)
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                        val permissionCheck = androidx.core.content.ContextCompat.checkSelfPermission(
-                            this@MainActivity, android.Manifest.permission.POST_NOTIFICATIONS
-                        )
-                        if (permissionCheck != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                            androidx.core.app.ActivityCompat.requestPermissions(
-                                this@MainActivity, arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101
+                LaunchedEffect(isLoggedInState) {
+                    if (isLoggedInState) {
+                        // Request Notification Permission on Android 13+ (API 33)
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                            val permissionCheck = androidx.core.content.ContextCompat.checkSelfPermission(
+                                this@MainActivity, android.Manifest.permission.POST_NOTIFICATIONS
                             )
+                            if (permissionCheck != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                androidx.core.app.ActivityCompat.requestPermissions(
+                                    this@MainActivity, arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101
+                                )
+                            }
                         }
                     }
                 }
@@ -319,7 +323,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                if (showCelebrationDialog) {
+                if (isLoggedInState && showCelebrationDialog) {
                     AlertDialog(
                         onDismissRequest = { showCelebrationDialog = false },
                         title = {
@@ -355,7 +359,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                if (showStartupUpdateDialog) {
+                if (isLoggedInState && showStartupUpdateDialog) {
                     AlertDialog(
                         onDismissRequest = { showStartupUpdateDialog = false },
                         title = {
@@ -400,7 +404,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                if (showChatFeatureNoticeDialog) {
+                if (isLoggedInState && showChatFeatureNoticeDialog) {
                     AlertDialog(
                         onDismissRequest = {
                             prefs.edit().putBoolean("has_seen_chat_feature_notice_v2", true).apply()

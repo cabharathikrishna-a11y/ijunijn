@@ -129,6 +129,10 @@ androidx-media3-cast = { group = "androidx.media3", name = "media3-cast", versio
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+androidLibrary = { id = "com.android.library", version.ref = "agp" }
+kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+jetbrainsCompose = { id = "org.jetbrains.compose", version = "1.7.0" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 google-devtools-ksp = { id = "com.google.devtools.ksp", version.ref = "googleDevtoolsKsp" }
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
@@ -137,3 +141,4 @@ google-services = { id = "com.google.gms.google-services", version.ref = "google
 firebase-perf = { id = "com.google.firebase.firebase-perf", version.ref = "firebasePerf" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version = "3.0.2" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+room = { id = "androidx.room", version.ref = "roomRuntime" }

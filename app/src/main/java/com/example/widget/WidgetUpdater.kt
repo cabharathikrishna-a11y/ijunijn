@@ -53,8 +53,19 @@ object WidgetUpdater {
         val allWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
         if (allWidgetIds.isEmpty()) return
 
+        val defaultText = run {
+            FocusTimerManager.init(context)
+            val isMeFocusing = (FocusTimerManager.isTimerRunning.value || FocusTimerManager.isStopwatchActive.value) && FocusTimerManager.isFocusPhase.value
+            if (isMeFocusing) {
+                val task = FocusTimerManager.attachedTask.value?.title ?: "Focus Session"
+                "🎯 Focusing: $task"
+            } else {
+                "No active peers focusing"
+            }
+        }
+
         val textToShow = statusText ?: context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
-            .getString("last_friends_focus_text", "No active peers") ?: "No active peers"
+            .getString("last_friends_focus_text", null) ?: defaultText
 
         if (statusText != null) {
             context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)

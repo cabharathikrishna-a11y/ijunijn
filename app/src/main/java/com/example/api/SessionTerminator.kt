@@ -37,7 +37,7 @@ object SessionTerminator {
 
             // Action 2: Check for a Midnight Crossover
             val firstStartEvent = updatedTimeline.firstOrNull { it.event.lowercase() == "start" }
-            val sessionStartFromId = originalSessionId.substringAfter("sess_").toLongOrNull()
+            val sessionStartFromId = originalSessionId.substringAfter("sess_").takeWhile { it.isDigit() }.toLongOrNull()
             val firstStartTs = if (sessionStartFromId != null && sessionStartFromId > 0L && sessionStartFromId <= trueTime) {
                 sessionStartFromId
             } else {

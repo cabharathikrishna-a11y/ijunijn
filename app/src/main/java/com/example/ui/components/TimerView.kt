@@ -510,38 +510,6 @@ fun TimerView(viewModel: AppViewModel, modifier: Modifier = Modifier) {
                     .padding(if (isTablet) 16.dp else 4.dp)
             ) {
                 val sduiPrefs = com.example.api.RemoteConfigManager.sduiPreferences.collectAsStateWithLifecycle().value
-                if (sduiPrefs.motivationalBannerText.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 6.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Motivational Banner Icon",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = sduiPrefs.motivationalBannerText,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
 
                 // Header Top Bar Row
                 Row(
@@ -586,17 +554,48 @@ fun TimerView(viewModel: AppViewModel, modifier: Modifier = Modifier) {
                             )
                         }
                     } else {
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(end = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            FriendsFocusPill(
-                                viewModel = viewModel,
-                                onClick = { viewModel.navigateTo(Screen.LIVE_SPHERE) }
-                            )
+                        FriendsFocusPill(
+                            viewModel = viewModel,
+                            onClick = { viewModel.navigateTo(Screen.LIVE_SPHERE) }
+                        )
+
+                        if (sduiPrefs.motivationalBannerText.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 8.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = "Motivational Banner Icon",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = sduiPrefs.motivationalBannerText,
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
+
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -2337,7 +2336,13 @@ fun FriendsFocusPill(
     val focusingAvatars = remember(focusingPeers, isMeFocusing, userEmoji, viewModel.firestoreAvatars.size) {
         val list = mutableListOf<String>()
         if (isMeFocusing) {
-            val myAvatar = if (userEmoji.isNotEmpty()) userEmoji else "👤"
+            val googleAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(viewModel.getApplication())
+            val photoUrl = googleAccount?.photoUrl?.toString() ?: ""
+            val myAvatar = when {
+                userEmoji.isNotEmpty() && userEmoji != "👤" -> userEmoji
+                photoUrl.isNotEmpty() -> photoUrl
+                else -> "👤"
+            }
             list.add(myAvatar)
         }
         focusingPeers.forEach { (_, u) ->

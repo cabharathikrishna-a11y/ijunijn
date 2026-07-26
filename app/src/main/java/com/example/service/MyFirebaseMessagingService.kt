@@ -65,6 +65,25 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 return
             }
 
+            if (messageType == "KEEP_NOTES_SYNC" || messageType == "keep_notes_sync" || messageType == "keep_notes" ||
+                messageType == "ALL_DATA_SYNC" || messageType == "TASKS_SYNC" || messageType == "JOURNAL_SYNC" ||
+                messageType == "HEALTH_SYNC" || messageType == "FILES_SYNC" || messageType == "FINANCE_SYNC" ||
+                messageType == "GDRIVE_SYNC_TRIGGER") {
+                val email = prefs.getString("user_email", "") ?: ""
+                if (email.isNotBlank()) {
+                    Log.i(TAG, "Received FCM live sync signal ($messageType). Pulling updated app data from cloud...")
+                    val db = AppDatabase.getInstance(applicationContext)
+                    com.example.api.AppDataLiveSyncEngine.pullAllDataFromCloud(applicationContext, email, db)
+                    
+                    if (messageType == "GDRIVE_SYNC_TRIGGER" && com.example.util.GoogleDriveSyncManager.hasDrivePermission(applicationContext)) {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            com.example.util.GoogleDriveSyncManager.restoreAllAppData(applicationContext, db)
+                        }
+                    }
+                }
+                return
+            }
+
             val isChatMessage = messageType == "chat" ||
                     data.containsKey("sender_id") ||
                     data.containsKey("chat_message") ||

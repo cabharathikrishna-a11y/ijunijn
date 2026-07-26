@@ -146,6 +146,7 @@ class KeepAliveService : Service() {
                 Unit
             }.collect {
                 updateNotificationDirectly()
+                com.example.widget.WidgetUpdater.updateAllWidgets(applicationContext)
             }
         }
 

@@ -698,6 +698,8 @@ object FocusTimerManager {
                     editor.putBoolean("timer_is_focus_phase", isFocusPhaseFromTimeline)
                     editor.putBoolean("timer_is_tab_focus_selected", !isStopwatch)
                     editor.putLong("accumulated_time_ms", session.base_focus_time_ms)
+                    editor.putInt("timer_cumulative_seconds", (session.base_focus_time_ms / 1000).toInt())
+                    editor.putInt("saved_stopwatch_seconds", (session.base_focus_time_ms / 1000).toInt())
                     editor.putLong("last_resume_time_ms", if (isRunning) session.last_event_ts_ms else -1L)
                     editor.putString("timer_attached_tag", session.tag)
                     editor.putBoolean("is_paused", session.status == "PAUSED")
@@ -739,6 +741,15 @@ object FocusTimerManager {
         val savedLastActiveTimestamp = prefs.getSafeLong("timer_last_active_timestamp", -1L)
         
         _accumulatedSessionTimeMs.value = savedAccumulated
+        val restoredSecs = (savedAccumulated / 1000).toInt()
+        if (restoredSecs > 0) {
+            if (_cumulativeSessionFocusSeconds.value < restoredSecs) {
+                _cumulativeSessionFocusSeconds.value = restoredSecs
+            }
+            if (_stopwatchSeconds.value < restoredSecs) {
+                _stopwatchSeconds.value = restoredSecs
+            }
+        }
         setLastResumeTimeMs(if (savedLastResume != -1L) savedLastResume else null)
         _currentSessionStartMs.value = if (savedSessionStart != -1L) savedSessionStart else null
         
@@ -1646,6 +1657,45 @@ object FocusTimerManager {
         com.example.widget.WidgetUpdater.updateAllWidgets(appContext)
     }
 
+    fun extractSessionStartMs(
+        sessionId: String?,
+        lastEventTsMs: Long? = null,
+        baseFocusMs: Long = 0L,
+        baseBreakMs: Long = 0L,
+        timeline: List<com.example.api.TimelineEvent>? = null
+    ): Long {
+        val trueNow = com.example.util.TimeEngine.getUniversalTimeMs()
+        
+        if (!timeline.isNullOrEmpty()) {
+            val startEvent = timeline.firstOrNull { 
+                val act = it.event.lowercase().trim()
+                act == "start"
+            }
+            if (startEvent != null && startEvent.timestamp > 0L && startEvent.timestamp <= trueNow) {
+                return startEvent.timestamp
+            }
+        }
+
+        if (!sessionId.isNullOrEmpty()) {
+            val raw = sessionId.substringAfter("sess_")
+            val digitsOnly = raw.takeWhile { it.isDigit() }
+            val parsed = digitsOnly.toLongOrNull()
+            if (parsed != null && parsed > 0L && parsed <= trueNow) {
+                return parsed
+            }
+        }
+
+        if (lastEventTsMs != null && lastEventTsMs > 0L) {
+            val estimatedStart = lastEventTsMs - baseFocusMs - baseBreakMs
+            if (estimatedStart > 0L && estimatedStart <= trueNow) {
+                return estimatedStart
+            }
+            return lastEventTsMs
+        }
+
+        return trueNow - maxOf(0L, baseFocusMs)
+    }
+
     fun persistFocusSession(context: Context, elapsedSecs: Int, isTimer: Boolean): FocusRecord? {
         if (elapsedSecs <= 0) return null
         
@@ -1711,9 +1761,12 @@ object FocusTimerManager {
         }
         
         recordSessionCompleteOrReset(true)
-        val sessionStart = currentSession?.session_id?.substringAfter("sess_")?.toLongOrNull() 
-            ?: currentSession?.last_event_ts_ms 
-            ?: (StableTime.currentTimeMillis() - elapsedSecs * 1000L)
+        val sessionStart = extractSessionStartMs(
+            sessionId = currentSession?.session_id,
+            lastEventTsMs = currentSession?.last_event_ts_ms,
+            baseFocusMs = currentSession?.base_focus_time_ms ?: (elapsedSecs * 1000L),
+            baseBreakMs = currentSession?.base_break_time_ms ?: 0L
+        )
 
         if (_verifiedSessionStartMs.value == null) {
             _verifiedSessionStartMs.value = sessionStart
@@ -1796,30 +1849,30 @@ object FocusTimerManager {
         FocusDriftDetector.stopMonitoring()
         _isTimerRunning.value = false
 
-        val elapsedSecs = _cumulativeSessionFocusSeconds.value
+        val chunkMs = if (_isTimerRunning.value) getCurrentChunkMs() else 0L
+        val totalMs = _accumulatedSessionTimeMs.value + chunkMs
+        val calculatedSecs = (totalMs / 1000).toInt()
+        var elapsedSecs = maxOf(_cumulativeSessionFocusSeconds.value, calculatedSecs)
+
+        if (saveSession && elapsedSecs <= 0) {
+            try {
+                val dbSession = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                    com.example.data.AppDatabase.getInstance(appContext).localActiveSessionDao().getActiveSession()
+                }
+                if (dbSession != null && dbSession.base_focus_time_ms > 0) {
+                    elapsedSecs = (dbSession.base_focus_time_ms / 1000).toInt()
+                }
+            } catch (e: Exception) {
+                Log.e("FocusTimerManager", "Error reading DB active session in resetTimer", e)
+            }
+        }
+
         val logCat = if (isPassiveCalibrationInProgress || !saveSession) "CALIBRATION" else "BUTTON_PRESS"
         addSystemLog(appContext, "Reset Timer", logCat, "SaveSession=$saveSession, ElapsedSecs=${elapsedSecs}s")
         
-        // Zero out active timer memory state immediately so UI won't double count
-        _cumulativeSessionFocusSeconds.value = 0
-        _accumulatedSessionTimeMs.value = 0L
-        _stopwatchSeconds.value = 0
-        _isPaused.value = false
-        setLastResumeTimeMs(null)
-        setOptimisticTodayFocusSeconds(null)
-        _currentSessionStartMs.value = null
-        savedStopwatchSeconds = 0
+        val shouldSave = saveSession && !isPassiveCalibrationInProgress && elapsedSecs > 0 && _isFocusPhase.value && !_wasStartedFromStopwatch.value
 
-        try {
-            kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
-                val db = com.example.data.AppDatabase.getInstance(appContext)
-                db.openHelper.writableDatabase.execSQL("DELETE FROM local_active_session")
-            }
-        } catch (e: Exception) {
-            Log.e("FocusTimerManager", "Error clearing local_active_session synchronously in resetTimer", e)
-        }
-        
-        if (saveSession && !isPassiveCalibrationInProgress && elapsedSecs > 0 && _isFocusPhase.value && !_wasStartedFromStopwatch.value) {
+        if (shouldSave) {
             val rtdbEmail = com.example.api.DynamicCommandManager.activeEmail
             if (rtdbEmail.isNotEmpty()) {
                 val timeline = com.example.api.DynamicCommandManager.currentTimelineFlow.value
@@ -1887,6 +1940,27 @@ object FocusTimerManager {
                         e.printStackTrace()
                     }
                 }
+            }
+        }
+
+        // Zero out active timer memory state
+        _cumulativeSessionFocusSeconds.value = 0
+        _accumulatedSessionTimeMs.value = 0L
+        _stopwatchSeconds.value = 0
+        _isPaused.value = false
+        setLastResumeTimeMs(null)
+        setOptimisticTodayFocusSeconds(null)
+        _currentSessionStartMs.value = null
+        savedStopwatchSeconds = 0
+
+        if (!shouldSave) {
+            try {
+                kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                    val db = com.example.data.AppDatabase.getInstance(appContext)
+                    db.openHelper.writableDatabase.execSQL("DELETE FROM local_active_session")
+                }
+            } catch (e: Exception) {
+                Log.e("FocusTimerManager", "Error clearing local_active_session synchronously in resetTimer", e)
             }
         }
 
@@ -2256,30 +2330,30 @@ object FocusTimerManager {
         FocusDriftDetector.stopMonitoring()
         _isStopwatchActive.value = false
 
-        val elapsedSecs = _stopwatchSeconds.value
+        val chunkMs = if (_isStopwatchActive.value) getCurrentChunkMs() else 0L
+        val totalMs = _accumulatedSessionTimeMs.value + chunkMs
+        val calculatedSecs = (totalMs / 1000).toInt()
+        var elapsedSecs = maxOf(_stopwatchSeconds.value, _cumulativeSessionFocusSeconds.value, calculatedSecs)
+
+        if (saveSession && elapsedSecs <= 0) {
+            try {
+                val dbSession = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                    com.example.data.AppDatabase.getInstance(appContext).localActiveSessionDao().getActiveSession()
+                }
+                if (dbSession != null && dbSession.base_focus_time_ms > 0) {
+                    elapsedSecs = (dbSession.base_focus_time_ms / 1000).toInt()
+                }
+            } catch (e: Exception) {
+                Log.e("FocusTimerManager", "Error reading DB active session in resetStopwatch", e)
+            }
+        }
+
         val logCat = if (isPassiveCalibrationInProgress || !saveSession) "CALIBRATION" else "BUTTON_PRESS"
         addSystemLog(appContext, "Reset Stopwatch", logCat, "SaveSession=$saveSession, Seconds=${elapsedSecs}s")
         
-        // Zero out active stopwatch memory state immediately so UI won't double count
-        _stopwatchSeconds.value = 0
-        _cumulativeSessionFocusSeconds.value = 0
-        _accumulatedSessionTimeMs.value = 0L
-        _isPaused.value = false
-        savedStopwatchSeconds = 0
-        setLastResumeTimeMs(null)
-        setOptimisticTodayFocusSeconds(null)
-        _currentSessionStartMs.value = null
+        val shouldSave = saveSession && !isPassiveCalibrationInProgress && elapsedSecs > 0
 
-        try {
-            kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
-                val db = com.example.data.AppDatabase.getInstance(appContext)
-                db.openHelper.writableDatabase.execSQL("DELETE FROM local_active_session")
-            }
-        } catch (e: Exception) {
-            Log.e("FocusTimerManager", "Error clearing local_active_session synchronously in resetStopwatch", e)
-        }
-        
-        if (saveSession && !isPassiveCalibrationInProgress && elapsedSecs > 0) {
+        if (shouldSave) {
             val rtdbEmail = com.example.api.DynamicCommandManager.activeEmail
             if (rtdbEmail.isNotEmpty()) {
                 val timeline = com.example.api.DynamicCommandManager.currentTimelineFlow.value
@@ -2350,12 +2424,24 @@ object FocusTimerManager {
             }
         }
 
+        // Zero out active stopwatch memory state
         _stopwatchSeconds.value = 0
         _cumulativeSessionFocusSeconds.value = 0
         _accumulatedSessionTimeMs.value = 0L
         setLastResumeTimeMs(null)
         _isPaused.value = false
         savedStopwatchSeconds = 0
+
+        if (!shouldSave) {
+            try {
+                kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                    val db = com.example.data.AppDatabase.getInstance(appContext)
+                    db.openHelper.writableDatabase.execSQL("DELETE FROM local_active_session")
+                }
+            } catch (e: Exception) {
+                Log.e("FocusTimerManager", "Error clearing local_active_session synchronously in resetStopwatch", e)
+            }
+        }
 
         // Reset phase and wasStartedFromStopwatch flags so they don't get stuck in break mode
         _isFocusPhase.value = true
@@ -4755,10 +4841,32 @@ object FocusSessionDbHelper {
             dbMutex.withLock {
                 try {
                     val db = AppDatabase.getInstance(context)
-                    val currentSession = db.localActiveSessionDao().getActiveSession()
-                val nowMs = TimeEngine.getUniversalTimeMs()
-                
-                if (currentSession == null) {
+                    val dbSession = db.localActiveSessionDao().getActiveSession()
+                    val nowMs = TimeEngine.getUniversalTimeMs()
+                    val memoryFocusMs = maxOf(
+                        FocusTimerManager.accumulatedSessionTimeMs.value,
+                        FocusTimerManager.stopwatchSeconds.value * 1000L,
+                        FocusTimerManager.cumulativeSessionFocusSeconds.value * 1000L
+                    )
+                    val currentSession = if (dbSession != null) {
+                        dbSession
+                    } else if (memoryFocusMs >= 1000L) {
+                        val fallbackStart = FocusTimerManager.currentSessionStartMs.value ?: (nowMs - memoryFocusMs)
+                        com.example.data.LocalActiveSession(
+                            session_id = com.example.api.DynamicCommandManager.activeSessionId.ifEmpty { "sess_${fallbackStart}" },
+                            status = "PAUSED",
+                            mode = com.example.api.DynamicCommandManager.currentTimerModeFlow.value,
+                            tag = FocusTimerManager.attachedTag.value.ifEmpty { "Study" },
+                            task_title = FocusTimerManager.attachedTask.value?.title ?: "Focus Session",
+                            base_focus_time_ms = memoryFocusMs,
+                            base_break_time_ms = 0L,
+                            last_event_ts_ms = nowMs,
+                            base_focus_formatted = TimeEngine.formatDuration(memoryFocusMs),
+                            last_event_formatted = TimeEngine.formatTimestamp(nowMs)
+                        )
+                    } else null
+                    
+                    if (currentSession == null) {
                     Log.w("FocusSessionDbHelper", "Focus folder/session is nil on end! Ending/Wiping session.")
                     val wipePayload = JSONObject().apply {
                         put("status", "IDLE")
@@ -4840,10 +4948,16 @@ object FocusSessionDbHelper {
                 val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(nowMs))
                 
                 // --- DYNAMIC CAUSALITY GUARD ---
-                val sessionStart = currentSession.session_id.substringAfter("sess_").toLongOrNull() ?: currentSession.last_event_ts_ms
-                val maxAllowedMs = TimeEngine.getUniversalTimeMs() - sessionStart
-                if (finalFocusMs > maxAllowedMs + 5000L) {
-                    android.util.Log.w("FocusSessionDbHelper", "Causality Guard: Aborting session archival. Session focus duration exceeds total elapsed time since session start.")
+                val sessionStart = FocusTimerManager.extractSessionStartMs(
+                    sessionId = currentSession.session_id,
+                    lastEventTsMs = currentSession.last_event_ts_ms,
+                    baseFocusMs = currentSession.base_focus_time_ms,
+                    baseBreakMs = currentSession.base_break_time_ms,
+                    timeline = timeline
+                )
+                val maxAllowedMs = maxOf(0L, TimeEngine.getUniversalTimeMs() - sessionStart)
+                if (finalFocusMs > maxAllowedMs + 60000L) {
+                    android.util.Log.w("FocusSessionDbHelper", "Causality Guard: Aborting session archival. Session focus duration ($finalFocusMs ms) exceeds max allowed ($maxAllowedMs ms).")
                     withContext(Dispatchers.Main) {
                         android.widget.Toast.makeText(context, "You cannot record more focus time than has elapsed since start.", android.widget.Toast.LENGTH_LONG).show()
                     }
@@ -4874,11 +4988,7 @@ object FocusSessionDbHelper {
                     return@launch
                 }
 
-                val startTimeMs = try {
-                    currentSession.session_id.substringAfter("sess_").toLong()
-                } catch (e: Exception) {
-                    nowMs - finalFocusMs
-                }
+                val startTimeMs = sessionStart
 
                 val liveBreakMs = if (timelineBreakMs > 0L || timelinePauseMs > 0L) {
                     timelineBreakMs + timelinePauseMs

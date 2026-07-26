@@ -226,7 +226,6 @@ fun SettingsView(viewModel: AppViewModel, modifier: Modifier = Modifier) {
                     add(SettingsRowData("APP UPDATE CENTER", "Check for updates, manage background downloads, authenticate tester", Icons.Default.Refresh, Color(0xFF4CAF50)) { activePage = 16 })
                     add(SettingsRowData("2. DEEPA AI BRAIN", "Offline model caching, memories vault management", Icons.Default.Face, Color(0xFF00E5FF)) { activePage = 11 })
                     add(SettingsRowData("3. BACKUP & RESTORE", "JSON manual database import & security exports", Icons.Default.Refresh, Color(0xFFFFB300)) { activePage = 12 })
-                    add(SettingsRowData("NOTIFICATIONS & URGENT ALERTS", "POST_NOTIFICATIONS, High-Priority Alerts & Custom Decorated Layouts", Icons.Default.NotificationsActive, Color(0xFFFF5722)) { activePage = 25 })
                     if (isKeyboardConnected) {
                         add(SettingsRowData("KEYBOARD SHORTCUTS HELP", "View all connected physical keyboard shortcuts & mappings", Icons.Default.Keyboard, Color(0xFF9C27B0)) { activePage = 99 })
                     }
@@ -535,13 +534,6 @@ fun SettingsView(viewModel: AppViewModel, modifier: Modifier = Modifier) {
                     }
                 }
             }
-        }
-
-        25 -> {
-            NotificationStudioView(
-                viewModel = viewModel,
-                onBack = { activePage = 0 }
-            )
         }
 
         1 -> {

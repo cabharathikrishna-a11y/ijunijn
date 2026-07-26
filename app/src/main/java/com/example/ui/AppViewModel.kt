@@ -1470,7 +1470,38 @@ class AppViewModel(
     }
 
     fun prepareAndShowEndSessionDialog(sessionType: String, elapsedSecs: Int) {
-        if (elapsedSecs < 1) {
+        var effectiveElapsedSecs = elapsedSecs
+        if (effectiveElapsedSecs < 1) {
+            val managerFocusSecs = (com.example.util.FocusTimerManager.accumulatedSessionTimeMs.value / 1000).toInt()
+            val managerStopwatchSecs = com.example.util.FocusTimerManager.stopwatchSeconds.value
+            val managerCumulativeSecs = com.example.util.FocusTimerManager.cumulativeSessionFocusSeconds.value
+            val maxManagerSecs = maxOf(managerFocusSecs, managerStopwatchSecs, managerCumulativeSecs)
+            
+            if (maxManagerSecs > 0) {
+                effectiveElapsedSecs = maxManagerSecs
+            } else {
+                try {
+                    val dbSession = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                        com.example.data.AppDatabase.getInstance(getApplication()).localActiveSessionDao().getActiveSession()
+                    }
+                    if (dbSession != null) {
+                        val dbFocusMs = if (dbSession.status == "FOCUSING") {
+                            com.example.util.TimeEngine.calculateLiveElapsedMs(dbSession.base_focus_time_ms, dbSession.last_event_ts_ms, dbSession.status)
+                        } else {
+                            dbSession.base_focus_time_ms
+                        }
+                        val dbSecs = (dbFocusMs / 1000).toInt()
+                        if (dbSecs > 0) {
+                            effectiveElapsedSecs = dbSecs
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("AppViewModel", "Error recovering active session elapsed time from DB", e)
+                }
+            }
+        }
+
+        if (effectiveElapsedSecs < 1) {
             val appContext = getApplication<android.app.Application>()
             if (sessionType == "timer") {
                 resetTimer(saveSession = false)
@@ -1483,50 +1514,22 @@ class AppViewModel(
         }
         
         setStopSessionType(sessionType)
-        setStoppedElapsedSeconds(elapsedSecs)
-        setEditHoursInput(elapsedSecs / 3600)
-        setEditMinutesInput((elapsedSecs % 3600) / 60)
-        setEditSecondsInput(elapsedSecs % 60)
+        setStoppedElapsedSeconds(effectiveElapsedSecs)
+        setEditHoursInput(effectiveElapsedSecs / 3600)
+        setEditMinutesInput((effectiveElapsedSecs % 3600) / 60)
+        setEditSecondsInput(effectiveElapsedSecs % 60)
         setShowElapsedTimeDialog(false) // Disable show elapsed time dialog completely!
 
         // Directly save the session in the database locally and synchronize with the cloud!
-        FocusTimerManager.persistFocusSession(
-            context = getApplication(),
-            elapsedSecs = elapsedSecs,
-            isTimer = (sessionType == "timer")
-        )
-
-        // Reset timer / stopwatch state locally FIRST so all flags (isPaused, isRunning, etc.) are cleared immediately
         if (sessionType == "timer") {
-            resetTimer(saveSession = false)
+            resetTimer(saveSession = true)
         } else {
-            resetStopwatch(saveSession = false)
+            resetStopwatch(saveSession = true)
         }
         clearPendingFocusReview()
         setSessionStartTimestamp(null)
         setFocusNotesInput("")
         setTimerImmersive(false)
-
-        val rtdbEmail = com.example.api.DynamicCommandManager.activeEmail
-        if (rtdbEmail.isNotEmpty()) {
-            val timeline = com.example.api.DynamicCommandManager.currentTimelineFlow.value
-            val mode = com.example.api.DynamicCommandManager.currentTimerModeFlow.value
-            val task = attachedTask.value?.title ?: "Focus Session"
-            val tag = attachedTag.value ?: "Study"
-            val sessionId = com.example.api.DynamicCommandManager.activeSessionId
-
-            viewModelScope.launch {
-                com.example.api.SessionTerminator.executeSessionTermination(
-                    context = getApplication(),
-                    email = rtdbEmail,
-                    currentTimeline = timeline,
-                    timerMode = mode,
-                    currentTask = task,
-                    currentTag = tag,
-                    originalSessionId = sessionId
-                )
-            }
-        }
 
         // Preserve start time and pause ranges before wiping out current session tracking
         com.example.util.FocusTimerManager.recordSessionCompleteOrReset(isSaving = true)
@@ -2457,7 +2460,10 @@ class AppViewModel(
         
         _userName.value = prefs.getString("user_name_${username}", "") ?: ""
         _userNickname.value = prefs.getString("user_nickname_${username}", "") ?: ""
-        _userEmoji.value = prefs.getString("user_emoji_${username}", "👤") ?: "👤"
+        val savedEmoji = prefs.getString("user_emoji_${username}", "👤") ?: "👤"
+        val googleAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(getApplication())
+        val gPhoto = googleAccount?.photoUrl?.toString() ?: ""
+        _userEmoji.value = if (savedEmoji != "👤" && savedEmoji.isNotEmpty()) savedEmoji else if (gPhoto.isNotEmpty()) gPhoto else "👤"
         _userEmail.value = prefs.getString("user_email_${username}", "") ?: ""
         
         val editor = prefs.edit()
@@ -2491,6 +2497,8 @@ class AppViewModel(
             com.example.api.ArenaLeaderboardEngine.startListening(getApplication(), email, "TODAY")
             com.example.api.BellReceiverService.startListening(getApplication(), email)
             com.example.api.FocusLockerManager.checkForExistingRoomsAndReconnect(getApplication(), email)
+            com.example.api.AppDataLiveSyncEngine.startListening(getApplication(), email, repository.db)
+            com.example.api.AppDataLiveSyncEngine.pullAllDataFromCloud(getApplication(), email, repository.db)
             syncSyllabusCompletionFromCloud()
             com.example.api.WeeklyStatsUpdater.adoptCloudStatsOnLogin(getApplication(), email)
             com.example.api.FirebaseRepairKit.repairUserData(getApplication(), email)
@@ -2642,8 +2650,14 @@ class AppViewModel(
         val username = _currentUsername.value ?: return
         val cachedName = prefs.getString("user_name_${username}", "") ?: ""
         val cachedNickname = prefs.getString("user_nickname_${username}", "") ?: ""
-        val cachedEmoji = prefs.getString("user_emoji_${username}", "") ?: ""
+        var cachedEmoji = prefs.getString("user_emoji_${username}", "") ?: prefs.getString("user_emoji", "") ?: ""
         val cachedEmail = prefs.getString("user_email_${username}", "") ?: ""
+
+        val googleAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(getApplication())
+        val photoUrl = googleAccount?.photoUrl?.toString() ?: ""
+        if ((cachedEmoji.isEmpty() || cachedEmoji == "👤") && photoUrl.isNotEmpty()) {
+            cachedEmoji = photoUrl
+        }
 
         _userName.value = cachedName
         _userNickname.value = cachedNickname
@@ -4249,37 +4263,75 @@ class AppViewModel(
     val keepNotesSyncStatus: StateFlow<String> = _keepNotesSyncStatus.asStateFlow()
 
     fun insertKeepNote(title: String, content: String, colorHex: String = "#202124", isPinned: Boolean = false) {
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val url = extractUrl(content) ?: extractUrl(title)
             val logoUrl = url?.let { resolveLogoUrl(it) }
-            val note = KeepNote(
-                title = title,
-                content = content,
-                colorHex = colorHex,
-                isPinned = isPinned,
-                websiteUrl = url,
-                customLogoUrl = logoUrl,
-                isSynced = false
-            )
-            repository.insertKeepNote(note)
+
+            val signature = com.example.api.KeepNotesLiveSyncEngine.createSignature(title, content)
+            val existingNotes = repository.getAllKeepNotesDirect()
+            val existingLocal = existingNotes.find { 
+                com.example.api.KeepNotesLiveSyncEngine.createSignature(it.title, it.content) == signature 
+            }
+
+            val noteToSave = if (existingLocal != null) {
+                existingLocal.copy(
+                    isPinned = isPinned,
+                    colorHex = colorHex,
+                    websiteUrl = url,
+                    customLogoUrl = logoUrl,
+                    isSynced = false
+                )
+            } else {
+                KeepNote(
+                    title = title,
+                    content = content,
+                    colorHex = colorHex,
+                    isPinned = isPinned,
+                    websiteUrl = url,
+                    customLogoUrl = logoUrl,
+                    isSynced = false
+                )
+            }
+
+            if (existingLocal != null) {
+                repository.updateKeepNote(noteToSave)
+            } else {
+                repository.insertKeepNote(noteToSave)
+            }
+
+            val email = _userEmail.value.ifEmpty { prefs.getString("user_email", "") ?: "" }
+            if (email.isNotBlank()) {
+                com.example.api.KeepNotesLiveSyncEngine.pushNoteToCloud(getApplication(), email, noteToSave)
+            }
         }
     }
 
     fun updateKeepNote(note: KeepNote) {
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val url = extractUrl(note.content) ?: extractUrl(note.title)
             val logoUrl = url?.let { resolveLogoUrl(it) }
-            repository.updateKeepNote(note.copy(
+            val updated = note.copy(
                 websiteUrl = url,
                 customLogoUrl = logoUrl,
                 isSynced = false
-            ))
+            )
+            repository.updateKeepNote(updated)
+
+            val email = _userEmail.value.ifEmpty { prefs.getString("user_email", "") ?: "" }
+            if (email.isNotBlank()) {
+                com.example.api.KeepNotesLiveSyncEngine.pushNoteToCloud(getApplication(), email, updated)
+            }
         }
     }
 
     fun deleteKeepNote(note: KeepNote) {
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             repository.deleteKeepNote(note)
+
+            val email = _userEmail.value.ifEmpty { prefs.getString("user_email", "") ?: "" }
+            if (email.isNotBlank()) {
+                com.example.api.KeepNotesLiveSyncEngine.deleteNoteFromCloud(getApplication(), email, note)
+            }
         }
     }
 
@@ -10318,6 +10370,8 @@ class AppViewModel(
             com.example.api.ArenaLeaderboardEngine.startListening(getApplication(), emailToUse, "TODAY")
             com.example.api.BellReceiverService.startListening(getApplication(), emailToUse)
             com.example.api.FocusLockerManager.checkForExistingRoomsAndReconnect(getApplication(), emailToUse)
+            com.example.api.AppDataLiveSyncEngine.startListening(getApplication(), emailToUse, repository.db)
+            com.example.api.AppDataLiveSyncEngine.pullAllDataFromCloud(getApplication(), emailToUse, repository.db)
             syncSyllabusCompletionFromCloud()
             startListeningForSharedTasks()
             com.example.api.WeeklyStatsUpdater.adoptCloudStatsOnLogin(getApplication(), emailToUse)
