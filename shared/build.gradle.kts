@@ -49,7 +49,7 @@ kotlin {
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.11")
                 implementation("io.ktor:ktor-client-logging:2.3.11")
 
-                implementation("androidx.datastore:datastore-preferences-core:1.1.1")
+                implementation("com.russhwolf:multiplatform-settings:1.1.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
             }
@@ -57,6 +57,7 @@ kotlin {
 
         val androidMain by getting {
             dependencies {
+                implementation("androidx.datastore:datastore-preferences-core:1.1.1")
                 implementation("io.ktor:ktor-client-okhttp:2.3.11")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
             }
@@ -65,6 +66,7 @@ kotlin {
         val desktopMain by getting {
             dependencies {
                 implementation(compose.desktop.currentOs)
+                implementation("androidx.datastore:datastore-preferences-core:1.1.1")
                 implementation("io.ktor:ktor-client-cio:2.3.11")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.1")
             }
