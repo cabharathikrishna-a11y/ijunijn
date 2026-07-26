@@ -320,7 +320,9 @@ jobs:
         gradle wasmJsBrowserDistribution || ./gradlew wasmJsBrowserDistribution || gradle wasmJsBrowserProductionWebpack || echo "Wasm build task finished"
 
     - name: Deploy Web App to Firebase Hosting
-      if: ${{ secrets.FIREBASE_CREDENTIALS != '' }}
+      env:
+        FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_CREDENTIALS }}
+      if: ${{ env.FIREBASE_SERVICE_ACCOUNT != '' }}
       uses: FirebaseExtended/action-hosting-deploy@v0
       with:
         repoToken: '${{ secrets.GITHUB_TOKEN }}'
