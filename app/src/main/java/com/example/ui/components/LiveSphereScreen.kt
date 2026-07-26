@@ -82,6 +82,7 @@ fun LiveSphereScreen(
     LaunchedEffect(myEmail) {
         if (myEmail.isNotBlank()) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.example.api.DevicePresenceManager.updateDeviceFocusStats(context, myEmail)
                 com.example.api.WeeklyStatsUpdater.updateWeeklyStats(context, myEmail, 0L, "")
             }
             com.example.api.ArenaLeaderboardEngine.startListening(context, myEmail, "TODAY")

@@ -167,6 +167,9 @@ object PeerLiveSphereManager {
                             val currentTag = timerSnapshot.child("Current_Tag").getValue(String::class.java) ?: "Study"
                             val timerMode = timerSnapshot.child("Timer_Mode").getValue(String::class.java) ?: "pomodoro"
                             val status = timerSnapshot.child("Status").getValue(String::class.java) ?: "Relaxing"
+                            val todayFocusMsFromTimer = timerSnapshot.child("Todays_Focus_Ms").getValue(Long::class.java)
+                                ?: timerSnapshot.child("todayFocusMs").getValue(Long::class.java)
+                                ?: 0L
                             val lastUpdated = timerSnapshot.child("Last_Updated").getValue(Long::class.java)
                                 ?: com.example.util.TimeEngine.getTrueTimeMs()
 
@@ -247,7 +250,8 @@ object PeerLiveSphereManager {
                                 timeline = timelineList,
                                 lastUpdated = lastUpdated,
                                 customEmoji = emojiVal,
-                                devices = devicesMap
+                                devices = devicesMap,
+                                todayFocusMs = todayFocusMsFromTimer
                             )
 
                             try {

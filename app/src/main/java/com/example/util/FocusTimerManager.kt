@@ -4841,32 +4841,10 @@ object FocusSessionDbHelper {
             dbMutex.withLock {
                 try {
                     val db = AppDatabase.getInstance(context)
-                    val dbSession = db.localActiveSessionDao().getActiveSession()
-                    val nowMs = TimeEngine.getUniversalTimeMs()
-                    val memoryFocusMs = maxOf(
-                        FocusTimerManager.accumulatedSessionTimeMs.value,
-                        FocusTimerManager.stopwatchSeconds.value * 1000L,
-                        FocusTimerManager.cumulativeSessionFocusSeconds.value * 1000L
-                    )
-                    val currentSession = if (dbSession != null) {
-                        dbSession
-                    } else if (memoryFocusMs >= 1000L) {
-                        val fallbackStart = FocusTimerManager.currentSessionStartMs.value ?: (nowMs - memoryFocusMs)
-                        com.example.data.LocalActiveSession(
-                            session_id = com.example.api.DynamicCommandManager.activeSessionId.ifEmpty { "sess_${fallbackStart}" },
-                            status = "PAUSED",
-                            mode = com.example.api.DynamicCommandManager.currentTimerModeFlow.value,
-                            tag = FocusTimerManager.attachedTag.value.ifEmpty { "Study" },
-                            task_title = FocusTimerManager.attachedTask.value?.title ?: "Focus Session",
-                            base_focus_time_ms = memoryFocusMs,
-                            base_break_time_ms = 0L,
-                            last_event_ts_ms = nowMs,
-                            base_focus_formatted = TimeEngine.formatDuration(memoryFocusMs),
-                            last_event_formatted = TimeEngine.formatTimestamp(nowMs)
-                        )
-                    } else null
-                    
-                    if (currentSession == null) {
+                    val currentSession = db.localActiveSessionDao().getActiveSession()
+                val nowMs = TimeEngine.getUniversalTimeMs()
+                
+                if (currentSession == null) {
                     Log.w("FocusSessionDbHelper", "Focus folder/session is nil on end! Ending/Wiping session.")
                     val wipePayload = JSONObject().apply {
                         put("status", "IDLE")
@@ -5117,6 +5095,18 @@ object FocusSessionDbHelper {
                     .putString("local_device_upload_status", "PENDING")
                     .putLong("last_saved_session_timestamp", System.currentTimeMillis())
                     .apply()
+
+                val realEmail = prefs.getString("user_email", "") ?: ""
+                if (realEmail.isNotEmpty()) {
+                    try {
+                        com.example.api.DevicePresenceManager.updateDeviceFocusStats(context, realEmail)
+                    } catch (e: Exception) {
+                        Log.e("FocusSessionDbHelper", "Error updating device focus stats at session end", e)
+                    }
+                }
+                if (com.example.util.NetworkChecker.isOnline(context)) {
+                    com.example.api.OutboxDrainer.start(context)
+                }
 
                 withContext(Dispatchers.Main) {
                     onArchived(archiveRecord)

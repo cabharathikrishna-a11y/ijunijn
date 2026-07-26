@@ -359,6 +359,17 @@ object DevicePresenceManager {
                 )
                 
                 deviceRef.updateChildren(statsUpdates)
+
+                val activeTimerRef = database.getReference("FOCUS_TIMMER")
+                    .child("USER")
+                    .child(sanitizedEmail)
+                    .child("ACTIVE_FOCUS_TIMER")
+                val timerTodayMap = mapOf<String, Any>(
+                    "Todays_Focus_Ms" to finalTodayFocusMs,
+                    "todayFocusMs" to finalTodayFocusMs
+                )
+                activeTimerRef.updateChildren(timerTodayMap)
+
                 appPrefs.edit().putString("local_device_upload_status", "COMPLETED").apply()
                 Log.d(TAG, "Successfully updated device focus timings in Firebase")
 

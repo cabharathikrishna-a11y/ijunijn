@@ -12,7 +12,8 @@ data class PeerLiveState(
     val timeline: List<TimelineEvent>,
     val lastUpdated: Long,
     val customEmoji: String? = null,
-    val devices: Map<String, com.example.api.DeviceStats>? = null
+    val devices: Map<String, com.example.api.DeviceStats>? = null,
+    val todayFocusMs: Long = 0L
 )
 
 data class PeerUiCardModel(

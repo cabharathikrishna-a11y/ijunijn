@@ -1521,15 +1521,43 @@ class AppViewModel(
         setShowElapsedTimeDialog(false) // Disable show elapsed time dialog completely!
 
         // Directly save the session in the database locally and synchronize with the cloud!
+        FocusTimerManager.persistFocusSession(
+            context = getApplication(),
+            elapsedSecs = effectiveElapsedSecs,
+            isTimer = (sessionType == "timer")
+        )
+
+        // Reset timer / stopwatch state locally FIRST so all flags (isPaused, isRunning, etc.) are cleared immediately
         if (sessionType == "timer") {
-            resetTimer(saveSession = true)
+            resetTimer(saveSession = false)
         } else {
-            resetStopwatch(saveSession = true)
+            resetStopwatch(saveSession = false)
         }
         clearPendingFocusReview()
         setSessionStartTimestamp(null)
         setFocusNotesInput("")
         setTimerImmersive(false)
+
+        val rtdbEmail = com.example.api.DynamicCommandManager.activeEmail
+        if (rtdbEmail.isNotEmpty()) {
+            val timeline = com.example.api.DynamicCommandManager.currentTimelineFlow.value
+            val mode = com.example.api.DynamicCommandManager.currentTimerModeFlow.value
+            val task = attachedTask.value?.title ?: "Focus Session"
+            val tag = attachedTag.value ?: "Study"
+            val sessionId = com.example.api.DynamicCommandManager.activeSessionId
+
+            viewModelScope.launch {
+                com.example.api.SessionTerminator.executeSessionTermination(
+                    context = getApplication(),
+                    email = rtdbEmail,
+                    currentTimeline = timeline,
+                    timerMode = mode,
+                    currentTask = task,
+                    currentTag = tag,
+                    originalSessionId = sessionId
+                )
+            }
+        }
 
         // Preserve start time and pause ranges before wiping out current session tracking
         com.example.util.FocusTimerManager.recordSessionCompleteOrReset(isSaving = true)
@@ -9247,12 +9275,25 @@ class AppViewModel(
                 try {
                     val peersMap = com.example.api.PeerLiveSphereManager.peerLiveStates.value
                     val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                    val calYesterday = java.util.Calendar.getInstance().apply { add(java.util.Calendar.DAY_OF_YEAR, -1) }
+                    val yesterdayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(calYesterday.time)
+                    val calTomorrow = java.util.Calendar.getInstance().apply { add(java.util.Calendar.DAY_OF_YEAR, 1) }
+                    val tomorrowStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(calTomorrow.time)
+
                     val uiCards = peersMap.values.map { peer ->
                         val maxDeviceTodayMs = peer.devices?.values
-                            ?.filter { it.lastUpdateDate == todayStr || it.lastUpdateDate.isNullOrEmpty() }
+                            ?.filter { dev ->
+                                dev.lastUpdateDate.isNullOrEmpty() ||
+                                dev.lastUpdateDate == todayStr ||
+                                dev.lastUpdateDate == yesterdayStr ||
+                                dev.lastUpdateDate == tomorrowStr ||
+                                dev.todayFocusMs > 0L
+                            }
                             ?.maxOfOrNull { it.todayFocusMs } ?: 0L
+
+                        val baseTodayMs = maxOf(peer.todayFocusMs, maxDeviceTodayMs)
                         val activeSessionFocusMs = com.example.api.TimelineSyncEngine.calculateAccumulatedFocusMs(peer.timeline, peer.status)
-                        val elapsedMs = maxOf(maxDeviceTodayMs, maxDeviceTodayMs + activeSessionFocusMs)
+                        val elapsedMs = maxOf(baseTodayMs, baseTodayMs + maxOf(0L, activeSessionFocusMs))
                         val formattedTime = com.example.api.TimelineSyncEngine.formatTimeMsToHhMmSs(elapsedMs)
                         com.example.api.PeerUiCardModel(
                             peerState = peer,
