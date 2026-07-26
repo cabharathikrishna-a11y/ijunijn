@@ -1,5 +1,3 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     id("com.android.kotlin.multiplatform.library")
@@ -23,6 +21,7 @@ kotlin {
     }
 
     wasmJs {
+        moduleName = "shared"
         browser {
             commonWebpackConfig {
                 outputFileName = "shared.js"
@@ -39,17 +38,16 @@ kotlin {
                 implementation(compose.material3)
                 implementation(compose.ui)
                 implementation(compose.components.resources)
-                implementation(compose.components.uiToolingPreview)
 
                 implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
                 implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
 
-                implementation("io.ktor:ktor-client-core:2.3.11")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.11")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.11")
-                implementation("io.ktor:ktor-client-logging:2.3.11")
+                implementation("io.ktor:ktor-client-core:3.0.1")
+                implementation("io.ktor:ktor-client-content-negotiation:3.0.1")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.1")
+                implementation("io.ktor:ktor-client-logging:3.0.1")
 
-                implementation("com.russhwolf:multiplatform-settings:1.1.1")
+                implementation("com.russhwolf:multiplatform-settings:1.2.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
             }
@@ -58,7 +56,7 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 implementation("androidx.datastore:datastore-preferences-core:1.1.1")
-                implementation("io.ktor:ktor-client-okhttp:2.3.11")
+                implementation("io.ktor:ktor-client-okhttp:3.0.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
             }
         }
@@ -67,14 +65,14 @@ kotlin {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation("androidx.datastore:datastore-preferences-core:1.1.1")
-                implementation("io.ktor:ktor-client-cio:2.3.11")
+                implementation("io.ktor:ktor-client-cio:3.0.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.1")
             }
         }
 
         val wasmJsMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-js:2.3.11")
+                implementation("io.ktor:ktor-client-js:3.0.1")
             }
         }
     }
@@ -82,23 +80,4 @@ kotlin {
 
 compose.resources {
     packageOfResClass = "com.example.shared.resources"
-}
-
-compose.desktop {
-    application {
-        mainClass = "com.example.desktop.MainKt"
-        nativeDistributions {
-            targetFormats(TargetFormat.Exe, TargetFormat.Msi)
-            packageName = "LifeOS"
-            packageVersion = "1.0.0"
-            description = "Life OS Cross-Platform Application"
-            vendor = "Life OS Team"
-            
-            windows {
-                menu = true
-                shortcut = true
-                dirChooser = true
-            }
-        }
-    }
 }
