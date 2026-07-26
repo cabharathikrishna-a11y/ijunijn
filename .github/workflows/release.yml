@@ -174,9 +174,13 @@ jobs:
         gradle-version: '9.3.1'
         validate-wrappers: false
 
+    - name: Regenerate Gradle Wrapper
+      run: gradle wrapper --gradle-version 9.3.1
+      shell: bash
+
     - name: Package Windows Executable (.exe)
       run: |
-        ./gradlew packageReleaseDistributionForCurrentOS -PcustomVersionCode=${{ needs.get_version.outputs.version_code }} -PcustomVersionName="${{ needs.get_version.outputs.version_name }}" || ./gradlew packageExe -PcustomVersionCode=${{ needs.get_version.outputs.version_code }} || echo "Windows Gradle packaging finished"
+        gradle packageReleaseDistributionForCurrentOS -PcustomVersionCode=${{ needs.get_version.outputs.version_code }} -PcustomVersionName="${{ needs.get_version.outputs.version_name }}" || ./gradlew packageReleaseDistributionForCurrentOS -PcustomVersionCode=${{ needs.get_version.outputs.version_code }} -PcustomVersionName="${{ needs.get_version.outputs.version_name }}" || gradle packageExe || echo "Windows Gradle packaging finished"
       shell: bash
 
     - name: Locate and Prepare Windows Executable
@@ -305,14 +309,18 @@ jobs:
         gradle-version: '9.3.1'
         validate-wrappers: false
 
+    - name: Regenerate Gradle Wrapper
+      run: gradle wrapper --gradle-version 9.3.1
+
     - name: Grant Execute Permission for Gradle
       run: chmod +x gradlew || true
 
     - name: Build Kotlin/Wasm Production Distribution
       run: |
-        ./gradlew wasmJsBrowserDistribution || ./gradlew wasmJsBrowserProductionWebpack || ./gradlew wasmJsBrowserDevelopmentExecutableDistribution || echo "Wasm build task finished"
+        gradle wasmJsBrowserDistribution || ./gradlew wasmJsBrowserDistribution || gradle wasmJsBrowserProductionWebpack || echo "Wasm build task finished"
 
     - name: Deploy Web App to Firebase Hosting
+      if: ${{ secrets.FIREBASE_CREDENTIALS != '' }}
       uses: FirebaseExtended/action-hosting-deploy@v0
       with:
         repoToken: '${{ secrets.GITHUB_TOKEN }}'
