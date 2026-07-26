@@ -143,7 +143,7 @@ object FirestoreArchiver {
             )
 
             val documentsMap = mutableMapOf<String, com.google.firebase.firestore.DocumentSnapshot>()
-            val emailsToQuery = listOf(sanitizedEmail, email.trim()).distinct()
+            val emailsToQuery = listOf(sanitizedEmail).filter { it.isNotEmpty() }
 
             for (eKey in emailsToQuery) {
                 if (eKey.isEmpty()) continue
@@ -313,6 +313,7 @@ object FirestoreArchiver {
     }
 
     suspend fun fetchSingleSessionFromFirestore(context: Context, email: String, sessionId: String): LocalHistoryVault? {
+        val sanitizedEmail = DevicePresenceManager.sanitizeEmail(email).ifEmpty { email }
         val trimmedId = sessionId.trim()
         if (trimmedId.isBlank()) return null
 
@@ -331,7 +332,7 @@ object FirestoreArchiver {
             val collectionsToTry = listOf("focus_records", "focus_history")
             for (col in collectionsToTry) {
                 val docSnap = suspendCancellableCoroutine<com.google.firebase.firestore.DocumentSnapshot?> { cont ->
-                    firestore.collection("users").document(email)
+                    firestore.collection("users").document(sanitizedEmail)
                         .collection(col).document(trimmedId)
                         .get()
                         .addOnCompleteListener { task ->

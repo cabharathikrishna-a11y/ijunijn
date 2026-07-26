@@ -96,9 +96,9 @@ class KeepAliveService : Service() {
         createNotificationChannel()
         val initialNotification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("LifeOS Active System")
-            .setContentText("Initializing unbreakable scheduler...")
+            .setContentText("Initializing background daemon...")
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)
             .setSilent(true)
             .setOnlyAlertOnce(true)
@@ -262,14 +262,16 @@ class KeepAliveService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "LifeOS Core Daemon",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "Keeps LifeOS system scheduling services active and accurate"
+                description = "Keeps LifeOS background app monitoring & focus timer active"
+                setShowBadge(false)
+                lockscreenVisibility = Notification.VISIBILITY_SECRET
             }
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
         }
     }
@@ -292,9 +294,9 @@ class KeepAliveService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("LifeOS Active System")
-            .setContentText("Ensuring scheduler accuracy")
+            .setContentText("Ensuring accurate backgrounds & task scheduling")
             .setSmallIcon(com.example.R.drawable.ic_launcher_foreground)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -469,7 +471,7 @@ class KeepAliveService : Service() {
             .setContentTitle("LifeOS Active System")
             .setContentText("Ensuring accurate backgrounds & task scheduling")
             .setSmallIcon(com.example.R.drawable.ic_launcher_foreground)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setContentIntent(pendingIntent)
             .setOngoing(true)

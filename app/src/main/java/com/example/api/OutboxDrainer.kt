@@ -280,6 +280,7 @@ object OutboxDrainer {
     }
 
     private suspend fun uploadItem(context: Context, username: String, item: OutboxQueue): Boolean {
+        val targetUser = DevicePresenceManager.sanitizeEmail(username).ifEmpty { username }
         if (item.routing_target == "FIRESTORE_DIRECT_VAULT") {
             val payload = JSONObject(item.payload_json)
             val recordId = payload.optString("recordId")
@@ -302,13 +303,13 @@ object OutboxDrainer {
                         "timestamp" to com.google.firebase.firestore.FieldValue.serverTimestamp()
                     )
 
-                    firestore.collection("users").document(username)
+                    firestore.collection("users").document(targetUser)
                         .collection("daily_records").document(dateString)
                         .collection("sessions").document(recordId)
                         .set(deletionMap, com.google.firebase.firestore.SetOptions.merge())
                         .awaitTask()
 
-                    firestore.collection("users").document(username)
+                    firestore.collection("users").document(targetUser)
                         .collection("focus_history").document(recordId)
                         .set(deletionMap, com.google.firebase.firestore.SetOptions.merge())
                         .awaitTask()
@@ -350,13 +351,13 @@ object OutboxDrainer {
                         "timestamp" to com.google.firebase.firestore.FieldValue.serverTimestamp()
                     )
 
-                    firestore.collection("users").document(username)
+                    firestore.collection("users").document(targetUser)
                         .collection("daily_records").document(dateString)
                         .collection("sessions").document(recordId)
                         .set(sessionMap, com.google.firebase.firestore.SetOptions.merge())
                         .awaitTask()
 
-                    firestore.collection("users").document(username)
+                    firestore.collection("users").document(targetUser)
                         .collection("focus_history").document(recordId)
                         .set(sessionMap, com.google.firebase.firestore.SetOptions.merge())
                         .awaitTask()
@@ -414,21 +415,21 @@ object OutboxDrainer {
                 )
 
                 // Write directly to Cloud Firestore users/$uid/daily_records/$date/sessions/$id
-                firestore.collection("users").document(username)
+                firestore.collection("users").document(targetUser)
                     .collection("daily_records").document(dateString)
                     .collection("sessions").document(recordId)
                     .set(sessionMap, com.google.firebase.firestore.SetOptions.merge())
                     .awaitTask()
-                Log.d("OutboxDrainer", "Saved session to users/$username/daily_records/$dateString/sessions/$recordId successfully in Firestore database: $dbId")
+                Log.d("OutboxDrainer", "Saved session to users/$targetUser/daily_records/$dateString/sessions/$recordId successfully in Firestore database: $dbId")
 
                 // Also save to focus_history for simple and efficient historical pulling
-                firestore.collection("users").document(username)
+                firestore.collection("users").document(targetUser)
                     .collection("focus_history").document(recordId)
                     .set(sessionMap, com.google.firebase.firestore.SetOptions.merge())
                     .awaitTask()
 
                 // Execute atomic FieldValue.increment() on daily stats: users/$uid/daily_records/$date
-                val dailyStatsRef = firestore.collection("users").document(username)
+                val dailyStatsRef = firestore.collection("users").document(targetUser)
                     .collection("daily_records").document(dateString)
 
                 val dailyStatsUpdates = hashMapOf(
@@ -610,26 +611,26 @@ object OutboxDrainer {
                     )
                     
                     // A. Save focus history record in Firestore
-                    firestore.collection("users").document(username)
+                    firestore.collection("users").document(targetUser)
                         .collection("focus_history").document(recordId)
                         .set(sessionMap, com.google.firebase.firestore.SetOptions.merge())
                         .awaitTask()
 
                     // B. Save focus records in Firestore
-                    firestore.collection("users").document(username)
+                    firestore.collection("users").document(targetUser)
                         .collection("focus_records").document(recordId)
                         .set(sessionMap, com.google.firebase.firestore.SetOptions.merge())
                         .awaitTask()
 
                     // C. Save daily record
-                    firestore.collection("users").document(username)
+                    firestore.collection("users").document(targetUser)
                         .collection("daily_records").document(dateString)
                         .collection("sessions").document(recordId)
                         .set(sessionMap, com.google.firebase.firestore.SetOptions.merge())
                         .awaitTask()
 
                     // D. Increment daily statistics
-                    val dailyStatsRef = firestore.collection("users").document(username)
+                    val dailyStatsRef = firestore.collection("users").document(targetUser)
                         .collection("daily_records").document(dateString)
 
                     val dailyStatsUpdates = hashMapOf(

@@ -364,8 +364,8 @@ object DynamicCommandManager {
                     return
                 }
 
-                // If local device is actively running a timer and remote is IDLE/None, skip calibration to avoid resetting local timer
-                if (hasLocalActive && !isRemoteActive) {
+                // If local device is actively running a timer as commander and remote is IDLE/None, skip calibration to avoid resetting local timer
+                if (isLocalCommander && hasLocalActive && !isRemoteActive) {
                     Log.d(TAG, "Local device is actively running timer as commander, remote is IDLE. Skipping calibration.")
                     return
                 }
@@ -482,7 +482,7 @@ object DynamicCommandManager {
                 return@addOnSuccessListener
             }
 
-            if (hasLocalActive && !isRemoteActive) {
+            if (isLocalCommander && hasLocalActive && !isRemoteActive) {
                 Log.d(TAG, "forceReadActiveFocusTimerAndCalibrate: Local device is actively running timer as commander, remote is IDLE. Skipping calibration.")
                 return@addOnSuccessListener
             }

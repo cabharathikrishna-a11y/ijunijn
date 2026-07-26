@@ -186,21 +186,51 @@ fun SettingsView(viewModel: AppViewModel, modifier: Modifier = Modifier) {
     var selectedTab by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
 
-    val allCategories = remember {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isKeyboardConnected = remember(configuration) {
+        val configKeyboard = configuration.keyboard == android.content.res.Configuration.KEYBOARD_QWERTY ||
+                configuration.hardKeyboardHidden == android.content.res.Configuration.HARDKEYBOARDHIDDEN_NO
+        if (configKeyboard) {
+            true
+        } else {
+            var hasHardwareKeyboard = false
+            try {
+                val inputManager = context.getSystemService(Context.INPUT_SERVICE) as? android.hardware.input.InputManager
+                if (inputManager != null) {
+                    val deviceIds = android.view.InputDevice.getDeviceIds()
+                    for (id in deviceIds) {
+                        val device = android.view.InputDevice.getDevice(id)
+                        if (device != null && !device.isVirtual && (device.sources and android.view.InputDevice.SOURCE_KEYBOARD) == android.view.InputDevice.SOURCE_KEYBOARD) {
+                            if (device.keyboardType == 2) {
+                                hasHardwareKeyboard = true
+                                break
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore exception
+            }
+            hasHardwareKeyboard
+        }
+    }
+
+    val allCategories = remember(isKeyboardConnected) {
         listOf(
             SettingsCategoryData(
                 title = "Core Systems & AI",
                 tabId = 1,
-                items = listOf(
-                    SettingsRowData("1. GENERAL SYSTEM", "Tab alignment, navigation bar reordering, style configurations", Icons.Default.Settings, Color(0xFF2196F3)) { activePage = 1 },
-                    SettingsRowData("DIAGNOSTICS & BACKGROUND", "Fix stopwatch lockscreen freeze & background recording on Samsung/Oppo/Lenovo/Moto", Icons.Default.Info, Color(0xFFE53935)) { activePage = 17 },
-                    SettingsRowData("APP UPDATE CENTER", "Check for updates, manage background downloads, authenticate tester", Icons.Default.Refresh, Color(0xFF4CAF50)) { activePage = 16 },
-                    SettingsRowData("2. DEEPA AI BRAIN", "Offline model caching, memories vault management", Icons.Default.Face, Color(0xFF00E5FF)) { activePage = 11 },
-                    SettingsRowData("FLEXBOX & GRID LAYOUT STUDIO", "Interactive 2D Grid & FlexBox visual engine playground", Icons.Default.Dashboard, Color(0xFF38BDF8)) { viewModel.navigateTo(Screen.FLEX_GRID_STUDIO) },
-                    SettingsRowData("3. BACKUP & RESTORE", "JSON manual database import & security exports", Icons.Default.Refresh, Color(0xFFFFB300)) { activePage = 12 },
-                    SettingsRowData("NOTIFICATIONS & URGENT ALERTS", "POST_NOTIFICATIONS, High-Priority Alerts & Custom Decorated Layouts", Icons.Default.NotificationsActive, Color(0xFFFF5722)) { activePage = 25 },
-                    SettingsRowData("KEYBOARD SHORTCUTS HELP", "View all connected physical keyboard shortcuts & mappings", Icons.Default.Keyboard, Color(0xFF9C27B0)) { activePage = 99 }
-                )
+                items = buildList {
+                    add(SettingsRowData("1. GENERAL SYSTEM", "Tab alignment, navigation bar reordering, style configurations", Icons.Default.Settings, Color(0xFF2196F3)) { activePage = 1 })
+                    add(SettingsRowData("DIAGNOSTICS & BACKGROUND", "Fix stopwatch lockscreen freeze & background recording on Samsung/Oppo/Lenovo/Moto", Icons.Default.Info, Color(0xFFE53935)) { activePage = 17 })
+                    add(SettingsRowData("APP UPDATE CENTER", "Check for updates, manage background downloads, authenticate tester", Icons.Default.Refresh, Color(0xFF4CAF50)) { activePage = 16 })
+                    add(SettingsRowData("2. DEEPA AI BRAIN", "Offline model caching, memories vault management", Icons.Default.Face, Color(0xFF00E5FF)) { activePage = 11 })
+                    add(SettingsRowData("3. BACKUP & RESTORE", "JSON manual database import & security exports", Icons.Default.Refresh, Color(0xFFFFB300)) { activePage = 12 })
+                    add(SettingsRowData("NOTIFICATIONS & URGENT ALERTS", "POST_NOTIFICATIONS, High-Priority Alerts & Custom Decorated Layouts", Icons.Default.NotificationsActive, Color(0xFFFF5722)) { activePage = 25 })
+                    if (isKeyboardConnected) {
+                        add(SettingsRowData("KEYBOARD SHORTCUTS HELP", "View all connected physical keyboard shortcuts & mappings", Icons.Default.Keyboard, Color(0xFF9C27B0)) { activePage = 99 })
+                    }
+                }
             ),
             SettingsCategoryData(
                 title = "Productivity Core",

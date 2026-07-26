@@ -2594,14 +2594,11 @@ class AppViewModel(
                     "email" to email,
                     "last_updated_ts" to timestamp
                 )
-                firestore.collection("users").document(email)
-                    .set(profileMap, com.google.firebase.firestore.SetOptions.merge())
                 val sanitized = com.example.api.DevicePresenceManager.sanitizeEmail(email)
-                if (sanitized != email) {
-                    firestore.collection("users").document(sanitized)
-                        .set(profileMap, com.google.firebase.firestore.SetOptions.merge())
-                }
-                Log.d("AppViewModel", "Successfully saved profile to Firestore for: $email")
+                val targetDoc = if (sanitized.isNotEmpty()) sanitized else email
+                firestore.collection("users").document(targetDoc)
+                    .set(profileMap, com.google.firebase.firestore.SetOptions.merge())
+                Log.d("AppViewModel", "Successfully saved profile to Firestore for: $targetDoc")
             } catch (e: Exception) {
                 Log.e("AppViewModel", "Failed to save profile to Firestore", e)
             }
@@ -2698,14 +2695,11 @@ class AppViewModel(
                     "email" to email,
                     "last_updated_ts" to timestamp
                 )
-                firestore.collection("users").document(email)
-                    .set(profileMap, com.google.firebase.firestore.SetOptions.merge())
                 val sanitized = com.example.api.DevicePresenceManager.sanitizeEmail(email)
-                if (sanitized != email) {
-                    firestore.collection("users").document(sanitized)
-                        .set(profileMap, com.google.firebase.firestore.SetOptions.merge())
-                }
-                Log.d("AppViewModel", "Successfully updated profile in Firestore for: $email")
+                val targetDoc = if (sanitized.isNotEmpty()) sanitized else email
+                firestore.collection("users").document(targetDoc)
+                    .set(profileMap, com.google.firebase.firestore.SetOptions.merge())
+                Log.d("AppViewModel", "Successfully updated profile in Firestore for: $targetDoc")
             } catch (e: Exception) {
                 Log.e("AppViewModel", "Failed to update profile in Firestore", e)
             }
